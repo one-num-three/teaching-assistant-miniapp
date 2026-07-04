@@ -1,0 +1,37 @@
+@import './variables.scss';
+
+.uni-button,
+button {
+  border-radius: 18rpx;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.uni-button::after,
+button::after {
+  border: none;
+}
+
+.uni-tag {
+  border-radius: 999rpx !important;
+  padding: 4rpx 16rpx !important;
+}
+
+.uni-tag--primary,
+.uni-tag--success {
+  background-color: $green-bg !important;
+  border-color: $green-bg !important;
+  color: $green !important;
+}
+
+.uni-tag--warning {
+  background-color: $amber-bg !important;
+  border-color: $amber-bg !important;
+  color: $amber !important;
+}
+
+.uni-tag--error {
+  background-color: $red-bg !important;
+  border-color: $red-bg !important;
+  color: $red !important;
+}

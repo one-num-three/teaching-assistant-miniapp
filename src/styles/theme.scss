@@ -1,0 +1,120 @@
+@import './variables.scss';
+@import './mixins.scss';
+
+page {
+  min-height: 100%;
+  background: $paper;
+  color: $text-primary;
+  font-family: $font-family-base;
+  font-size: 28rpx;
+}
+
+.page-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(9, 86, 140, 0.05), transparent 30%),
+    linear-gradient(180deg, $paper-light 0%, $paper 55%, #eaebef 100%);
+}
+
+.ink-top {
+  @include ink-header(248rpx);
+  padding: 64rpx 34rpx 52rpx;
+  box-sizing: border-box;
+}
+
+.ink-nav {
+  position: relative;
+  z-index: 1;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+}
+
+.nav-back {
+  position: absolute;
+  left: 0;
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+  font-weight: 300;
+}
+
+.content-layer {
+  position: relative;
+  z-index: 2;
+  margin-top: -26rpx;
+  padding: 0 32rpx 34rpx;
+  box-sizing: border-box;
+}
+
+.soft-card {
+  @include soft-card;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  justify-content: center;
+  margin: 30rpx 4rpx 20rpx;
+  color: $text-primary;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.section-heading::before,
+.section-heading::after {
+  content: '';
+  width: 42rpx;
+  height: 2rpx;
+  background: linear-gradient(90deg, transparent, rgba(31, 78, 95, 0.24));
+}
+
+.section-heading::after {
+  background: linear-gradient(90deg, rgba(31, 78, 95, 0.24), transparent);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  line-height: 1.2;
+}
+
+.pill.green {
+  background: $green-bg;
+  color: $green;
+}
+
+.pill.amber {
+  background: $amber-bg;
+  color: $amber;
+}
+
+.pill.blue {
+  background: rgba(31, 78, 95, 0.08);
+  color: $ink-blue;
+}
+
+.pill.red {
+  background: $red-bg;
+  color: $red;
+}
+
+.muted {
+  color: $text-secondary;
+}
+
+.safe-bottom {
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+}

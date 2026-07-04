@@ -2,6 +2,30 @@
 
 > 一款面向大学生支教志愿者的微信小程序原型，专注于支教项目的全流程管理——从档期发布、岗位认领、教案提交到知识沉淀。
 
+## 开发工作流
+
+本项目已经从静态 HTML 原型推进为 `uni-app + Vue 3 + TypeScript` 微信小程序工程。协作时请注意区分“源码目录”和“微信预览目录”：
+
+- 只修改源码：`src/`、`cloudfunctions/`、项目配置文件与文档。
+- 不要手动修改编译产物：`dist/dev/mp-weixin`、`dist/build/mp-weixin`。
+- 微信开发者工具导入目录：`D:\teaching-assistant-miniapp\dist\dev\mp-weixin`。
+
+开发预览时，在项目根目录运行：
+
+```bash
+cd /d D:\teaching-assistant-miniapp
+npm.cmd run dev:mp-weixin
+```
+
+提交或交付前，至少运行：
+
+```bash
+npm.cmd run type-check
+npm.cmd run build:mp-weixin
+```
+
+如果微信开发者工具里看到的效果和源码不一致，优先检查 `npm.cmd run dev:mp-weixin` 是否仍在运行，以及打开的是否是 `dist/dev/mp-weixin`，而不是直接编辑 `dist` 里的文件。
+
 ## 📱 项目概述
 
 本项目是「支教管理小程序」的高保真原型，采用雾霾蓝设计风格，旨在解决支教活动中常见的**信息不对称、流程不规范、资源难复用**三大痛点。

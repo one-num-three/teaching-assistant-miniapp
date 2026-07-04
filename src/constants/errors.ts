@@ -1,0 +1,30 @@
+export const ERROR_CODE = {
+  NO_PERMISSION: 'NO_PERMISSION',
+  PROJECT_NOT_FOUND: 'PROJECT_NOT_FOUND',
+  PROJECT_FULL: 'PROJECT_FULL',
+  ALREADY_CLAIMED: 'ALREADY_CLAIMED',
+  INVALID_STATUS: 'INVALID_STATUS',
+  FILE_TOO_LARGE: 'FILE_TOO_LARGE',
+  FILE_TYPE_NOT_ALLOWED: 'FILE_TYPE_NOT_ALLOWED',
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  UNKNOWN_ERROR: 'UNKNOWN_ERROR'
+} as const;
+
+export type ErrorCode = (typeof ERROR_CODE)[keyof typeof ERROR_CODE];
+
+export const ERROR_MESSAGE: Record<string, string> = {
+  [ERROR_CODE.NO_PERMISSION]: '你没有权限执行此操作',
+  [ERROR_CODE.PROJECT_NOT_FOUND]: '档期不存在',
+  [ERROR_CODE.PROJECT_FULL]: '该岗位已被认领满了',
+  [ERROR_CODE.ALREADY_CLAIMED]: '你已经认领过该项目',
+  [ERROR_CODE.INVALID_STATUS]: '当前状态暂不能执行此操作',
+  [ERROR_CODE.FILE_TOO_LARGE]: '文件大小不能超过 20MB',
+  [ERROR_CODE.FILE_TYPE_NOT_ALLOWED]: '仅支持 PDF、Word、PPT 文件',
+  [ERROR_CODE.NETWORK_ERROR]: '网络异常，请稍后重试',
+  [ERROR_CODE.UNKNOWN_ERROR]: '操作失败，请稍后重试'
+};
+
+export function getErrorMessage(code?: string, fallback = ERROR_MESSAGE.UNKNOWN_ERROR) {
+  if (!code) return fallback;
+  return ERROR_MESSAGE[code] || fallback;
+}

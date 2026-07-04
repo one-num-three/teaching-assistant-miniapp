@@ -1,0 +1,84 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "支教日历",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/materials/index",
+      "style": {
+        "navigationBarTitleText": "资料库",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/mine/index",
+      "style": {
+        "navigationBarTitleText": "我的",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/mine/profile",
+      "style": {
+        "navigationBarTitleText": "认证资料"
+      }
+    },
+    {
+      "path": "pages/project/detail",
+      "style": {
+        "navigationBarTitleText": "项目详情",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/lesson-plan/submit",
+      "style": {
+        "navigationBarTitleText": "提交教案",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/admin/review",
+      "style": {
+        "navigationBarTitleText": "教案审核台",
+        "navigationStyle": "custom"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "支教管理",
+    "navigationBarBackgroundColor": "#F2F4F8",
+    "backgroundColor": "#F2F4F8"
+  },
+  "tabBar": {
+    "color": "#8394A6",
+    "selectedColor": "#09568C",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "日历",
+        "iconPath": "static/tab/calendar.png",
+        "selectedIconPath": "static/tab/calendar-active.png"
+      },
+      {
+        "pagePath": "pages/materials/index",
+        "text": "资料库",
+        "iconPath": "static/tab/book.png",
+        "selectedIconPath": "static/tab/book-active.png"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的",
+        "iconPath": "static/tab/user.png",
+        "selectedIconPath": "static/tab/user-active.png"
+      }
+    ]
+  }
+}
