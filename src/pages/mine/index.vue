@@ -47,6 +47,12 @@
       </view>
 
       <view class="menu-group">
+        <view v-if="userStore.isGuest" class="menu-item" @click="goProfile">
+          <view class="menu-icon doc"></view>
+          <text>完善业务资料</text>
+          <text class="pill amber menu-pill">待认证</text>
+          <text class="arrow">›</text>
+        </view>
         <view class="menu-item">
           <view class="menu-icon chart"></view>
           <text>志愿服务时长统计</text>
@@ -65,7 +71,7 @@
         </view>
       </view>
 
-      <view class="menu-group">
+      <view v-if="showAdminEntry" class="menu-group">
         <view class="menu-item" @click="goAdmin">
           <view class="menu-icon calendar"></view>
           <text>档期发布工具</text>
@@ -90,11 +96,17 @@ import { useUserStore } from '@/stores/user'
 const userStore = useUserStore()
 const userInfo = computed(() => userStore.userInfo)
 const defaultAvatar = '/static/logo.png'
+const showAdminEntry = computed(() => userStore.isAdmin)
 
 const roleLine = computed(() => {
   if (userInfo.value?.college) return `${userInfo.value.college} · ${userInfo.value.grade}`
+  if (userStore.isGuest) return '待完善资料'
   return '支协成员 · 项目负责人'
 })
+
+const goProfile = () => {
+  uni.navigateTo({ url: '/pages/mine/profile' })
+}
 
 const goReview = () => {
   uni.navigateTo({ url: '/pages/admin/review' })

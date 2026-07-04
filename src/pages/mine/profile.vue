@@ -17,8 +17,8 @@
         <uni-forms-item label="年级" name="grade" required>
           <uni-data-picker v-model="formData.grade" :localdata="grades" placeholder="请选择年级" />
         </uni-forms-item>
-        <uni-forms-item label="学号" name="student_id" required>
-          <uni-easyinput v-model="formData.student_id" type="number" placeholder="请输入学号" />
+        <uni-forms-item label="学号" name="student_id">
+          <uni-easyinput v-model="formData.student_id" type="number" placeholder="选填，用于支协内部核验" />
         </uni-forms-item>
         <uni-forms-item label="手机号码" name="phone" required>
           <uni-easyinput v-model="formData.phone" type="number" placeholder="请输入手机号" />
@@ -67,7 +67,6 @@ const rules = {
   name: { rules: [{ required: true, errorMessage: '请输入姓名' }] },
   college: { rules: [{ required: true, errorMessage: '请选择学院' }] },
   grade: { rules: [{ required: true, errorMessage: '请选择年级' }] },
-  student_id: { rules: [{ required: true, errorMessage: '请输入学号' }] },
   phone: { rules: [{ required: true, errorMessage: '请输入手机号' }] }
 }
 
@@ -80,14 +79,7 @@ const submit = async () => {
     const res = await updateUserProfile(formData)
     
     // 更新本地 Store
-    if (userStore.userInfo) {
-      userStore.userInfo.roles = res.roles
-      userStore.userInfo.name = formData.name
-      userStore.userInfo.college = formData.college
-      userStore.userInfo.grade = formData.grade
-      userStore.userInfo.student_id = formData.student_id
-      userStore.userInfo.phone = formData.phone
-    }
+    userStore.setUser(res)
     
     uni.showToast({ title: '认证成功', icon: 'success' })
     setTimeout(() => {
