@@ -9,6 +9,10 @@ export const getProjects = async (params?: any): Promise<any[]> => {
   return callCloudFunction<any[]>('getProjects', params);
 };
 
+export const publishProject = async (payload: any): Promise<any> => {
+  return callCloudFunction<any>('publishProject', payload);
+};
+
 export const claimProjectLeader = async (projectId: string): Promise<any> => {
   return callCloudFunction<any>('claimProjectLeader', { projectId });
 };

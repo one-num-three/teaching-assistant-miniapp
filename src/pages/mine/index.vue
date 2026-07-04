@@ -113,7 +113,7 @@ const goReview = () => {
 }
 
 const goAdmin = () => {
-  uni.showToast({ title: '档期发布工具开发中', icon: 'none' })
+  uni.navigateTo({ url: '/pages/admin/publish' })
 }
 </script>
 

@@ -47,6 +47,13 @@
         "navigationBarTitleText": "教案审核台",
         "navigationStyle": "custom"
       }
+    },
+    {
+      "path": "pages/admin/publish",
+      "style": {
+        "navigationBarTitleText": "发布档期",
+        "navigationStyle": "custom"
+      }
     }
   ],
   "globalStyle": {
