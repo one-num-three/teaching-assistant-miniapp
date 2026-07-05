@@ -194,7 +194,7 @@ onMounted(() => {
 @import '@/styles/mixins.scss';
 
 .calendar-hero {
-  @include ink-header(242rpx);
+  @include ink-header(250rpx);
   padding: 64rpx 34rpx 54rpx;
   box-sizing: border-box;
 }
@@ -202,11 +202,13 @@ onMounted(() => {
 .calendar-panel {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(180deg, $ink-blue 0%, $ink-blue-deep 100%);
-  border-radius: 0 0 $radius-md $radius-md;
-  box-shadow: $shadow-soft;
-  padding: 24rpx 22rpx 26rpx;
-  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.985) 100%),
+    url('/static/ink-mountain-fade.png') center top / 100% auto no-repeat;
+  border-radius: 0 0 28rpx 28rpx;
+  box-shadow: 0 18rpx 48rpx rgba(31, 78, 95, 0.08);
+  padding: 22rpx 22rpx 30rpx;
+  color: $text-primary;
 }
 
 .calendar-panel::after {
@@ -214,10 +216,10 @@ onMounted(() => {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -10rpx;
-  height: 116rpx;
-  opacity: 0.28;
-  background: url('/static/ink-mountain-fade.png') center bottom / 100% auto no-repeat;
+  top: 0;
+  height: 90rpx;
+  background: linear-gradient(180deg, rgba(242, 244, 248, 0.32), transparent);
+  pointer-events: none;
 }
 
 .month-bar {
@@ -230,7 +232,7 @@ onMounted(() => {
 .month-title {
   position: relative;
   z-index: 1;
-  color: #fff;
+  color: $text-primary;
   font-size: 34rpx;
   font-weight: 700;
 }
@@ -239,7 +241,7 @@ onMounted(() => {
   position: relative;
   z-index: 1;
   width: 64rpx;
-  color: rgba(255, 255, 255, 0.68);
+  color: rgba(31, 78, 95, 0.34);
   font-size: 48rpx;
   text-align: center;
 }
@@ -254,7 +256,7 @@ onMounted(() => {
 .week-row text {
   position: relative;
   z-index: 1;
-  color: rgba(255, 255, 255, 0.56);
+  color: $text-muted;
   font-size: 24rpx;
   line-height: 52rpx;
 }
@@ -263,13 +265,13 @@ onMounted(() => {
   position: relative;
   z-index: 1;
   height: 62rpx;
-  color: rgba(255, 255, 255, 0.86);
+  color: $text-primary;
   font-size: 27rpx;
   line-height: 62rpx;
 }
 
 .date-cell.muted {
-  color: rgba(255, 255, 255, 0.34);
+  color: rgba(131, 148, 166, 0.72);
 }
 
 .date-cell.selected text {
@@ -278,10 +280,10 @@ onMounted(() => {
   height: 52rpx;
   align-items: center;
   justify-content: center;
-  color: $ink-blue;
+  color: #fff;
   border-radius: 50%;
-  background: $paper;
-  box-shadow: 0 8rpx 18rpx rgba(0, 0, 0, 0.14);
+  background: $ink-blue-deep;
+  box-shadow: 0 8rpx 18rpx rgba(9, 86, 140, 0.18);
 }
 
 .day-dot {
