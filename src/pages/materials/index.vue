@@ -50,6 +50,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { getMaterials } from '@/api/material'
 import { getTempFileURL, openDocument } from '@/utils/platform'
 
 const categories = [
@@ -134,15 +135,8 @@ const filteredLessons = computed(() => {
 const fetchLessons = async () => {
   loading.value = true
   try {
-    // #ifdef MP-WEIXIN
-    const db = wx.cloud.database()
-    const res = await db.collection('materials').orderBy('created_at', 'desc').limit(50).get()
-    lessons.value = res.data.length ? res.data : sampleLessons
-    // #endif
-
-    // #ifndef MP-WEIXIN
-    lessons.value = sampleLessons
-    // #endif
+    const list = await getMaterials()
+    lessons.value = list.length ? list : sampleLessons
   } catch (err) {
     console.error(err)
     lessons.value = sampleLessons

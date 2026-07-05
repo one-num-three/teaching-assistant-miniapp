@@ -47,6 +47,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import ProjectCard from '@/components/ProjectCard.vue'
+import { getProjects } from '@/api/project'
 
 interface CalendarDay {
   key: string
@@ -125,11 +126,13 @@ const calendarDays = computed<CalendarDay[]>(() => {
     cells.push({ key: `p-${label}`, label, date: formatDate(date), inMonth: false })
   }
 
+  const calendarProjects = projects.value.length ? projects.value : sampleProjects
+
   for (let label = 1; label <= daysInMonth; label += 1) {
     const date = new Date(currentYear.value, currentMonth.value, label)
     const iso = formatDate(date)
-    const hasProject = sampleProjects.some((item) => item.datetime?.startsWith(iso))
-    const pending = sampleProjects.some((item) => item.datetime?.startsWith(iso) && item.project_status === 'pending_claim')
+    const hasProject = calendarProjects.some((item) => item.datetime?.startsWith(iso))
+    const pending = calendarProjects.some((item) => item.datetime?.startsWith(iso) && item.project_status === 'pending_claim')
     cells.push({
       key: `c-${label}`,
       label,
@@ -166,15 +169,8 @@ const shiftMonth = (offset: number) => {
 const fetchProjects = async () => {
   loading.value = true
   try {
-    // #ifdef MP-WEIXIN
-    const db = wx.cloud.database()
-    const res = await db.collection('projects').orderBy('datetime', 'asc').limit(20).get()
-    projects.value = res.data.length ? res.data : sampleProjects
-    // #endif
-
-    // #ifndef MP-WEIXIN
-    projects.value = sampleProjects
-    // #endif
+    const list = await getProjects()
+    projects.value = list.length ? list : sampleProjects
   } catch (err) {
     console.error('Fetch projects failed', err)
     projects.value = sampleProjects

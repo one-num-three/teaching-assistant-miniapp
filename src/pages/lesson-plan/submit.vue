@@ -8,14 +8,14 @@
     </view>
 
     <view class="success-strip">
-      <text class="success-title">已成功认领！你是第一个</text>
-      <text class="success-sub">其他支协成员已无法再抢占此档期</text>
+      <text class="success-title">已成功认领，记得提交教案</text>
+      <text class="success-sub">本地测试模式会把教案保存到本机缓存，管理员审核后进入资料库。</text>
     </view>
 
     <view class="project-strip">
-      <text class="strip-label">待认领</text>
-      <text class="strip-title">红色手工折纸课</text>
-      <text class="strip-meta">7月12日 周六 14:00 · 雨花台区景明社区</text>
+      <text class="strip-label">{{ projectStatusText }}</text>
+      <text class="strip-title">{{ project?.title || '支教档期' }}</text>
+      <text class="strip-meta">{{ projectMeta }}</text>
       <text class="deadline">请在 24 小时内提交教案</text>
     </view>
 
@@ -30,7 +30,7 @@
         <view class="upload-zone" @click="chooseLessonFile">
           <view class="upload-mark"></view>
           <text class="upload-title">点击上传教案文件</text>
-          <text class="upload-hint">支持 Word (.docx) / PDF，最大 20MB</text>
+          <text class="upload-hint">本地测试可直接使用示例 PDF，正式版支持 Word / PDF / PPT</text>
         </view>
 
         <view class="file-card" v-if="selectedFile">
@@ -47,12 +47,12 @@
         <text class="preview-title">{{ lessonTitle }}</text>
         <view class="preview-page">
           <text class="preview-heading">课程目标</text>
-          <text class="preview-text">通过折纸活动锻炼小学生动手能力，融入红色教育元素。</text>
+          <text class="preview-text">通过主题活动建立课堂兴趣，完成知识讲解、互动练习和成果展示。</text>
           <text class="page-num">第 1 页</text>
         </view>
         <view class="preview-page">
           <text class="preview-heading">教学流程</text>
-          <text class="preview-text">导入展示、教师示范、分步跟学、助教巡回、作品分享。</text>
+          <text class="preview-text">导入展示、教师示范、分步练习、助教巡视、作品分享。</text>
           <text class="page-num">第 2 页</text>
         </view>
       </view>
@@ -63,34 +63,87 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { chooseFile } from '@/utils/platform'
+import { computed, onMounted, ref } from 'vue';
+import { getProjectDetail, uploadLesson } from '@/api/project';
+import { chooseFile } from '@/utils/platform';
 
-const lessonTitle = ref('红色手工折纸课：千纸鹤与五角星')
+const projectId = ref('');
+const project = ref<any>(null);
+const lessonTitle = ref('红色手工折纸课：千纸鹤与五角星');
 const selectedFile = ref<{ name: string; size: string } | null>({
   name: '红色手工折纸课教案_终稿.pdf',
-  size: '2.4 MB · 4 页'
-})
+  size: '2.4 MB'
+});
 
-const goBack = () => uni.navigateBack()
+const projectStatusText = computed(() => {
+  if (project.value?.project_status === 'revision_required') return '需修改';
+  if (project.value?.lesson_status === 'pending_review') return '待审核';
+  return '待提交';
+});
+
+const projectMeta = computed(() => {
+  if (!project.value) return '';
+  return `${project.value.datetime} · ${project.value.location}`;
+});
+
+const goBack = () => uni.navigateBack();
+
+const loadProject = async () => {
+  if (!projectId.value) return;
+  try {
+    project.value = await getProjectDetail(projectId.value);
+    lessonTitle.value = project.value.lesson_plan?.title || `${project.value.title} 教案`;
+  } catch (err) {
+    uni.showToast({ title: '项目不存在', icon: 'none' });
+  }
+};
 
 const chooseLessonFile = async () => {
   try {
-    const files = await chooseFile(1)
-    const file = files[0]
-    if (!file) return
+    const files = await chooseFile(1);
+    const file = files[0];
+    if (!file) return;
     selectedFile.value = {
       name: file.name,
       size: `${(file.size / 1024 / 1024).toFixed(1)} MB`
-    }
+    };
   } catch (err) {
-    uni.showToast({ title: '请在微信小程序中选择文件', icon: 'none' })
+    uni.showToast({ title: '本地测试已保留示例文件', icon: 'none' });
   }
-}
+};
 
-const submitLesson = () => {
-  uni.showToast({ title: '教案已提交审核', icon: 'success' })
-}
+const submitLesson = async () => {
+  if (!projectId.value) {
+    uni.showToast({ title: '缺少项目信息', icon: 'none' });
+    return;
+  }
+  if (!lessonTitle.value.trim()) {
+    uni.showToast({ title: '请输入教案标题', icon: 'none' });
+    return;
+  }
+  if (!selectedFile.value) {
+    uni.showToast({ title: '请先选择教案文件', icon: 'none' });
+    return;
+  }
+  try {
+    await uploadLesson(projectId.value, {
+      title: lessonTitle.value,
+      fileName: selectedFile.value.name,
+      size: selectedFile.value.size
+    });
+    uni.showToast({ title: '教案已提交审核', icon: 'success' });
+    setTimeout(() => uni.navigateBack(), 800);
+  } catch (err: any) {
+    uni.showToast({ title: err.message || '提交失败', icon: 'none' });
+  }
+};
+
+onMounted(() => {
+  const pages = getCurrentPages();
+  const page = pages[pages.length - 1];
+  projectId.value = (page as any).options?.id || '';
+  loadProject();
+});
 </script>
 
 <style lang="scss" scoped>

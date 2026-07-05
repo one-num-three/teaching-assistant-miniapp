@@ -9,65 +9,66 @@
 
     <view class="content-layer safe-bottom">
       <view class="pending-card">
-        <text class="pending-small">待审核 · 1 份教案</text>
-        <text class="pending-title">红色手工折纸课</text>
-        <text class="pending-meta">7月12日 周六 14:00 · 提交人：陈恩</text>
+        <text class="pending-small">待审核 · {{ pendingProjects.length }} 份教案</text>
+        <text class="pending-title">{{ currentProject?.title || '暂无待审核教案' }}</text>
+        <text class="pending-meta">{{ pendingMeta }}</text>
       </view>
 
-      <view class="review-card">
-        <view class="review-head">
-          <text class="card-title">教案详情</text>
-          <text class="pill amber">待审核</text>
-        </view>
+      <view v-if="!currentProject" class="state-card">所有教案都已处理</view>
 
-        <view class="info-block">
-          <text class="info-label">教案标题</text>
-          <text class="info-value">红色手工折纸课：千纸鹤与五角星</text>
-        </view>
+      <block v-else>
+        <view class="review-card">
+          <view class="review-head">
+            <text class="card-title">教案详情</text>
+            <text class="pill amber">待审核</text>
+          </view>
 
-        <view class="info-block">
-          <text class="info-label">教案文件</text>
-          <view class="file-line">
-            <view class="pdf-icon">PDF</view>
-            <view>
-              <text class="file-name">红色手工折纸课教案_终稿.pdf</text>
-              <text class="file-size">2.4 MB · 4 页</text>
+          <view class="info-block">
+            <text class="info-label">教案标题</text>
+            <text class="info-value">{{ currentProject.lesson_plan?.title }}</text>
+          </view>
+
+          <view class="info-block">
+            <text class="info-label">教案文件</text>
+            <view class="file-line">
+              <view class="pdf-icon">PDF</view>
+              <view>
+                <text class="file-name">{{ currentProject.lesson_plan?.file_name }}</text>
+                <text class="file-size">{{ currentProject.lesson_plan?.size }}</text>
+              </view>
             </view>
           </view>
-        </view>
 
-        <view class="info-block">
-          <text class="info-label">辅助岗位设置</text>
-          <view class="chips">
-            <text class="chip">助教 × 2</text>
-            <text class="chip">PPT × 1</text>
-            <text class="chip">摄影 × 1</text>
-            <text class="chip">场务 × 1</text>
+          <view class="info-block">
+            <text class="info-label">辅助岗位设置</text>
+            <view class="chips">
+              <text v-for="item in positionChips" :key="item" class="chip">{{ item }}</text>
+            </view>
+          </view>
+
+          <view class="info-block">
+            <text class="info-label">补充说明</text>
+            <text class="info-value">本地测试审核流：通过后进入招募中，并自动沉淀到资料库；驳回后返回需修改。</text>
+          </view>
+
+          <view class="action-row">
+            <button class="approve" :disabled="loading" @click="approve">通过立项</button>
+            <button class="reject" :disabled="loading" @click="reject">驳回修改</button>
           </view>
         </view>
-
-        <view class="info-block">
-          <text class="info-label">补充说明</text>
-          <text class="info-value">折纸材料已备齐，建议多带备用彩纸。</text>
-        </view>
-
-        <view class="action-row">
-          <button class="approve" @click="approve">通过立项</button>
-          <button class="reject" @click="reject">驳回释放</button>
-        </view>
-      </view>
+      </block>
 
       <view class="note-card">
         <text class="card-title">审核说明</text>
-        <text class="note-line">通过：项目立项，进入招募中</text>
-        <text class="note-line">驳回：档期释放，返回待认领</text>
+        <text class="note-line">通过：项目立项，进入招募中。</text>
+        <text class="note-line">驳回：保留负责人，返回需修改，可重新提交教案。</text>
       </view>
 
       <view class="note-card">
         <text class="card-title">快捷操作</text>
         <view class="quick-row">
-          <button class="quick primary">发布新档期</button>
-          <button class="quick ghost">查看已审核</button>
+          <button class="quick primary" @click="goPublish">发布新档期</button>
+          <button class="quick ghost" @click="loadPending">刷新列表</button>
         </view>
       </view>
     </view>
@@ -75,9 +76,67 @@
 </template>
 
 <script setup lang="ts">
-const goBack = () => uni.navigateBack()
-const approve = () => uni.showToast({ title: '已通过', icon: 'success' })
-const reject = () => uni.showToast({ title: '已驳回', icon: 'none' })
+import { computed, onMounted, ref } from 'vue';
+import { getReviewProjects, reviewLesson } from '@/api/project';
+
+const pendingProjects = ref<any[]>([]);
+const loading = ref(false);
+
+const currentProject = computed(() => pendingProjects.value[0] || null);
+const pendingMeta = computed(() => {
+  if (!currentProject.value) return '所有教案都已处理';
+  const submitter = currentProject.value.lesson_plan?.submitter_name || currentProject.value.leader?.name || '负责人';
+  return `${currentProject.value.datetime} · 提交人：${submitter}`;
+});
+
+const positionChips = computed(() => {
+  const positions = currentProject.value?.positions || {};
+  const names: Record<string, string> = {
+    assistant: '助教',
+    ppt: 'PPT',
+    photographer: '摄影',
+    logistics: '场务'
+  };
+  return Object.entries(positions)
+    .filter(([key]) => key !== 'lecturer')
+    .map(([key, raw]: any) => `${names[key] || key} × ${raw.total || 0}`);
+});
+
+const goBack = () => uni.navigateBack();
+
+const goPublish = () => {
+  uni.navigateTo({ url: '/pages/admin/publish' });
+};
+
+const loadPending = async () => {
+  pendingProjects.value = await getReviewProjects();
+};
+
+const approve = async () => {
+  if (!currentProject.value) return;
+  loading.value = true;
+  try {
+    await reviewLesson(currentProject.value._id, 'approve');
+    uni.showToast({ title: '已通过', icon: 'success' });
+    await loadPending();
+  } finally {
+    loading.value = false;
+  }
+};
+
+const reject = async () => {
+  if (!currentProject.value) return;
+  loading.value = true;
+  try {
+    await reviewLesson(currentProject.value._id, 'reject', '请补充课堂流程和材料清单');
+    uni.showToast({ title: '已驳回', icon: 'none' });
+    await loadPending();
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(loadPending);
 </script>
 
 <style lang="scss" scoped>
@@ -138,10 +197,16 @@ const reject = () => uni.showToast({ title: '已驳回', icon: 'none' })
 }
 
 .review-card,
-.note-card {
+.note-card,
+.state-card {
   @include soft-card;
   padding: 28rpx;
   margin-bottom: 24rpx;
+}
+
+.state-card {
+  color: $text-secondary;
+  text-align: center;
 }
 
 .review-head {

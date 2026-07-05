@@ -10,8 +10,8 @@
         <text class="detail-title">{{ project.title }}</text>
         <view class="meta-list">
           <text>时间：{{ project.datetime }}</text>
-          <text>地点：{{ project.location || project.address || project.school_name }}</text>
-          <text>受众：{{ project.target_audience || '小学生（3-6年级） · 约25人' }}</text>
+          <text>地点：{{ project.location }}</text>
+          <text>受众：{{ project.target_audience }}</text>
         </view>
       </view>
     </view>
@@ -19,6 +19,7 @@
     <view v-if="loading" class="content-layer">
       <view class="state-card">正在加载项目...</view>
     </view>
+
     <view v-else-if="!project" class="content-layer">
       <view class="state-card">未找到项目信息</view>
     </view>
@@ -42,13 +43,15 @@
             <text class="member-name">{{ project.leader?.name || '待认领' }}</text>
             <text class="member-role">{{ project.leader?.name ? '支协成员 · 已中标' : '抢占档期后提交教案' }}</text>
           </view>
-          <button v-if="!project.leader?.name" class="claim-main" @click="handleClaimLeader">抢占</button>
+          <button v-if="!project.leader?.name" class="claim-main" :disabled="claiming" @click="handleClaimLeader">
+            抢占
+          </button>
         </view>
       </view>
 
       <view class="section-block">
         <view class="block-title">岗位认领 · {{ filledCount }}/{{ totalCount }} 已满</view>
-        <view class="slot-card" v-for="slot in slots" :key="slot.key">
+        <view class="slot-card" v-for="slot in slots" :key="slot.uid">
           <image class="member-avatar" :src="slot.avatar || defaultAvatar" />
           <view class="slot-copy">
             <text class="member-name">{{ slot.name }}</text>
@@ -71,50 +74,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { claimPosition, claimProjectLeader } from '@/api/project'
-import { useUserStore } from '@/stores/user'
+import { computed, onMounted, ref } from 'vue';
+import { claimPosition, claimProjectLeader, getProjectDetail } from '@/api/project';
+import { useUserStore } from '@/stores/user';
 
-const userStore = useUserStore()
-const project = ref<any>(null)
-const loading = ref(true)
-const claiming = ref(false)
-const projectId = ref('')
-const defaultAvatar = '/static/logo.png'
-
-const sampleProject = {
-  _id: 'project-1',
-  title: '趣味科普：地球的呼吸',
-  datetime: '7月5日 周六 14:00-16:00',
-  location: '江宁区东山社区活动中心',
-  target_audience: '小学生（3-6年级） · 约25人',
-  project_status: 'recruiting',
-  lesson_status: 'approved',
-  leader: { user_id: 'u1', name: '王明', avatar: '' },
-  outline: ['地球为什么在“发烧”（温室效应入门）', '树叶的秘密（光合作用小实验）', '我们能做什么（低碳生活小行动）', '互动问答 + 小奖品'],
-  positions: {
-    lecturer: { total: 1, members: [{ user_id: 'u1', name: '王明' }] },
-    ppt: { total: 1, members: [{ user_id: 'u2', name: '李华', avatar: '' }] },
-    assistant: { total: 2, members: [] }
-  }
-}
+const userStore = useUserStore();
+const project = ref<any>(null);
+const loading = ref(true);
+const claiming = ref(false);
+const projectId = ref('');
+const defaultAvatar = '/static/logo.png';
 
 const statusMap: Record<string, { text: string; klass: string }> = {
   pending_claim: { text: '待认领', klass: 'amber' },
+  pending_review: { text: '待审核', klass: 'amber' },
   recruiting: { text: '招募中', klass: 'green' },
   revision_required: { text: '需修改', klass: 'red' },
   locked: { text: '已锁定', klass: 'blue' },
-  completed: { text: '已完成', klass: 'blue' }
-}
-
-const statusText = computed(() => statusMap[project.value?.project_status]?.text || '招募中')
-const statusClass = computed(() => statusMap[project.value?.project_status]?.klass || 'green')
-const outline = computed(() => project.value?.outline?.length ? project.value.outline : sampleProject.outline)
-
-const isLeader = computed(() => {
-  const openid = userStore.userInfo?.openid
-  return openid && project.value?.leader?.user_id === openid
-})
+  completed: { text: '已完成', klass: 'blue' },
+  cancelled: { text: '已取消', klass: 'blue' }
+};
 
 const positionNames: Record<string, string> = {
   lecturer: '主讲',
@@ -122,98 +101,92 @@ const positionNames: Record<string, string> = {
   ppt: 'PPT',
   photographer: '摄影',
   logistics: '场务'
-}
+};
+
+const statusText = computed(() => statusMap[project.value?.project_status]?.text || '待认领');
+const statusClass = computed(() => statusMap[project.value?.project_status]?.klass || 'amber');
+const outline = computed(() => project.value?.outline?.length ? project.value.outline : ['课程导入', '主题讲解', '互动练习', '总结反馈']);
+
+const isLeader = computed(() => {
+  const openid = userStore.userInfo?.openid;
+  return openid && project.value?.leader?.user_id === openid;
+});
 
 const slots = computed(() => {
-  const result: any[] = []
+  const result: any[] = [];
   Object.entries(project.value?.positions || {}).forEach(([key, raw]: any) => {
-    const total = raw.total || 0
-    const members = raw.members || []
+    const total = raw.total || 0;
+    const members = raw.members || [];
     for (let i = 0; i < total; i += 1) {
-      const member = members[i]
+      const member = members[i];
       result.push({
+        uid: `${key}-${i}`,
         key,
         role: positionNames[key] || key,
         name: member?.name || '等待认领',
         avatar: member?.avatar || '',
         claimed: Boolean(member)
-      })
+      });
     }
-  })
-  return result
-})
+  });
+  return result;
+});
 
-const totalCount = computed(() => slots.value.length)
-const filledCount = computed(() => slots.value.filter((item) => item.claimed).length)
+const totalCount = computed(() => slots.value.length);
+const filledCount = computed(() => slots.value.filter((item) => item.claimed).length);
 
 const goBack = () => {
-  uni.navigateBack()
-}
+  uni.navigateBack();
+};
 
 const goSubmit = () => {
-  uni.navigateTo({ url: `/pages/lesson-plan/submit?id=${project.value?._id || projectId.value}` })
-}
+  uni.navigateTo({ url: `/pages/lesson-plan/submit?id=${project.value?._id || projectId.value}` });
+};
 
 const fetchProjectDetail = async () => {
-  loading.value = true
+  loading.value = true;
   try {
-    // #ifdef MP-WEIXIN
-    if (projectId.value) {
-      const db = wx.cloud.database()
-      const res = await db.collection('projects').doc(projectId.value).get()
-      project.value = res.data || sampleProject
-    } else {
-      project.value = sampleProject
-    }
-    // #endif
-
-    // #ifndef MP-WEIXIN
-    project.value = sampleProject
-    // #endif
+    project.value = await getProjectDetail(projectId.value);
   } catch (err) {
-    console.error(err)
-    project.value = sampleProject
+    console.error(err);
+    project.value = null;
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 const handleClaimLeader = async () => {
-  claiming.value = true
+  claiming.value = true;
   try {
-    await claimProjectLeader(project.value._id)
-    uni.showToast({ title: '认领成功', icon: 'success' })
-    fetchProjectDetail()
+    await claimProjectLeader(project.value._id);
+    uni.showToast({ title: '认领成功', icon: 'success' });
+    fetchProjectDetail();
   } catch (err: any) {
-    uni.showToast({ title: err.message || '认领失败', icon: 'none' })
+    uni.showToast({ title: err.message || '认领失败', icon: 'none' });
   } finally {
-    claiming.value = false
+    claiming.value = false;
   }
-}
+};
 
 const handleClaimPosition = async (key: string) => {
-  if (project.value?.project_status !== 'recruiting') {
-    uni.showToast({ title: '当前状态暂不可认领', icon: 'none' })
-    return
-  }
-  claiming.value = true
+  claiming.value = true;
   try {
-    await claimPosition(project.value._id, key)
-    uni.showToast({ title: '认领成功', icon: 'success' })
-    fetchProjectDetail()
+    await claimPosition(project.value._id, key);
+    uni.showToast({ title: '认领成功', icon: 'success' });
+    fetchProjectDetail();
   } catch (err: any) {
-    uni.showToast({ title: err.message || '认领失败', icon: 'none' })
+    uni.showToast({ title: err.message || '认领失败', icon: 'none' });
   } finally {
-    claiming.value = false
+    claiming.value = false;
   }
-}
+};
 
 onMounted(() => {
-  const pages = getCurrentPages()
-  const page = pages[pages.length - 1]
-  projectId.value = (page as any).options?.id || ''
-  fetchProjectDetail()
-})
+  const pages = getCurrentPages();
+  const page = pages[pages.length - 1];
+  projectId.value = (page as any).options?.id || 'project-1';
+  fetchProjectDetail();
+});
 </script>
 
 <style lang="scss" scoped>
