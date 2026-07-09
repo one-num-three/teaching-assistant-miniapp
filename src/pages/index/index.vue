@@ -21,18 +21,28 @@
             v-for="day in calendarDays"
             :key="day.key"
             class="date-cell"
-            :class="{ muted: !day.inMonth, selected: day.date === selectedDate }"
+            :class="{
+              muted: !day.inMonth,
+              'selected-week': day.isSelectedWeek,
+              'week-start': day.isWeekStart,
+              'week-end': day.isWeekEnd,
+              'selected-day': day.date === selectedDate
+            }"
             @click="selectDay(day)"
           >
             <text>{{ day.label }}</text>
-            <view v-if="day.mark" class="day-dot" :class="day.mark"></view>
+            <view v-if="day.projectCount" class="day-count" :class="day.mark">{{ day.projectCount }}</view>
           </view>
         </view>
       </view>
 
-      <view class="section-heading">{{ scheduleTitle }}</view>
+      <view class="selection-summary">
+        <text class="summary-title">{{ scheduleTitle }}</text>
+        <text class="summary-subtitle">{{ scheduleSubtitle }}</text>
+      </view>
+
       <view v-if="loading" class="state-card">正在加载档期...</view>
-      <view v-else-if="visibleProjects.length === 0" class="state-card">当前日期暂无支教档期</view>
+      <view v-else-if="visibleProjects.length === 0" class="state-card">{{ emptyText }}</view>
       <block v-else>
         <ProjectCard
           v-for="proj in visibleProjects"
@@ -56,24 +66,68 @@ interface CalendarDay {
   date: string;
   inMonth: boolean;
   mark?: 'green' | 'amber';
+  projectCount: number;
+  isSelectedWeek: boolean;
+  isWeekStart: boolean;
+  isWeekEnd: boolean;
 }
 
 const weeks = ['日', '一', '二', '三', '四', '五', '六'];
-const currentYear = ref(2025);
-const currentMonth = ref(6);
-const selectedDate = ref('2025-07-05');
+const today = new Date();
+const currentYear = ref(today.getFullYear());
+const currentMonth = ref(today.getMonth());
+const selectedWeekStart = ref('');
+const selectedDate = ref('');
 const projects = ref<any[]>([]);
 const loading = ref(false);
 let didMount = false;
 
+const pad = (value: number) => String(value).padStart(2, '0');
+
 const formatDate = (date: Date) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+
+const parseDate = (date: string) => {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const addDays = (date: Date, offset: number) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + offset);
+  return next;
+};
+
+const getWeekStart = (date: Date) => {
+  return addDays(date, -date.getDay());
+};
+
+const getWeekEnd = (weekStartIso: string) => {
+  return formatDate(addDays(parseDate(weekStartIso), 6));
+};
+
+const formatMonthDay = (dateIso: string) => {
+  const date = parseDate(dateIso);
+  return `${date.getMonth() + 1}月${date.getDate()}日`;
 };
 
 const projectDate = (project: any) => project.date || String(project.datetime || '').slice(0, 10);
+
+const projectsByDate = computed(() => {
+  const map: Record<string, any[]> = {};
+  projects.value.forEach((project) => {
+    const date = projectDate(project);
+    if (!map[date]) map[date] = [];
+    map[date].push(project);
+  });
+  return map;
+});
+
+const selectedWeekEnd = computed(() => {
+  if (!selectedWeekStart.value) return '';
+  return getWeekEnd(selectedWeekStart.value);
+});
 
 const calendarDays = computed<CalendarDay[]>(() => {
   const start = new Date(currentYear.value, currentMonth.value, 1);
@@ -82,58 +136,116 @@ const calendarDays = computed<CalendarDay[]>(() => {
   const prevDays = new Date(currentYear.value, currentMonth.value, 0).getDate();
   const cells: CalendarDay[] = [];
 
+  const createCell = (date: Date, label: number, inMonth: boolean, key: string): CalendarDay => {
+    const iso = formatDate(date);
+    const dayProjects = projectsByDate.value[iso] || [];
+    const pending = dayProjects.some((item) => ['pending_claim', 'pending_review'].includes(item.project_status));
+    const weekStart = formatDate(getWeekStart(date));
+    return {
+      key,
+      label,
+      date: iso,
+      inMonth,
+      mark: dayProjects.length ? (pending ? 'amber' : 'green') : undefined,
+      projectCount: dayProjects.length,
+      isSelectedWeek: selectedWeekStart.value === weekStart,
+      isWeekStart: date.getDay() === 0,
+      isWeekEnd: date.getDay() === 6
+    };
+  };
+
   for (let i = firstDay - 1; i >= 0; i -= 1) {
     const label = prevDays - i;
     const date = new Date(currentYear.value, currentMonth.value - 1, label);
-    cells.push({ key: `p-${label}`, label, date: formatDate(date), inMonth: false });
+    cells.push(createCell(date, label, false, `p-${formatDate(date)}`));
   }
 
   for (let label = 1; label <= daysInMonth; label += 1) {
     const date = new Date(currentYear.value, currentMonth.value, label);
-    const iso = formatDate(date);
-    const dayProjects = projects.value.filter((item) => projectDate(item) === iso);
-    const hasProject = dayProjects.length > 0;
-    const pending = dayProjects.some((item) => item.project_status === 'pending_claim');
-    cells.push({
-      key: `c-${label}`,
-      label,
-      date: iso,
-      inMonth: true,
-      mark: hasProject ? (pending ? 'amber' : 'green') : undefined
-    });
+    cells.push(createCell(date, label, true, `c-${formatDate(date)}`));
   }
 
   const rest = 42 - cells.length;
   for (let label = 1; label <= rest; label += 1) {
     const date = new Date(currentYear.value, currentMonth.value + 1, label);
-    cells.push({ key: `n-${label}`, label, date: formatDate(date), inMonth: false });
+    cells.push(createCell(date, label, false, `n-${formatDate(date)}`));
   }
 
   return cells;
 });
 
 const visibleProjects = computed(() => {
-  const exact = projects.value.filter((item) => projectDate(item) === selectedDate.value);
-  if (exact.length) return exact;
+  if (selectedDate.value) {
+    return projects.value.filter((item) => projectDate(item) === selectedDate.value);
+  }
+  if (!selectedWeekStart.value || !selectedWeekEnd.value) return [];
   return projects.value.filter((item) => {
     const date = projectDate(item);
-    return date.startsWith(`${currentYear.value}-${String(currentMonth.value + 1).padStart(2, '0')}`);
+    return date >= selectedWeekStart.value && date <= selectedWeekEnd.value;
   });
 });
 
 const scheduleTitle = computed(() => {
-  const hasExact = projects.value.some((item) => projectDate(item) === selectedDate.value);
-  return hasExact ? `${selectedDate.value} 安排` : '本月安排';
+  if (selectedDate.value) return `${formatMonthDay(selectedDate.value)} 当日安排`;
+  if (!selectedWeekStart.value || !selectedWeekEnd.value) return '本周安排';
+  return `${formatMonthDay(selectedWeekStart.value)} - ${formatMonthDay(selectedWeekEnd.value)} 周安排`;
+});
+
+const scheduleSubtitle = computed(() => {
+  if (selectedDate.value) return '再次点击当天，可回到整周安排';
+  return '点击高亮周中的某一天，可只查看当天档期';
+});
+
+const emptyText = computed(() => {
+  return selectedDate.value ? '当日暂无支教档期，看看本周其他安排' : '本周暂无支教档期';
 });
 
 const selectDay = (day: CalendarDay) => {
-  selectedDate.value = day.date;
+  const weekStart = formatDate(getWeekStart(parseDate(day.date)));
+  const isSameWeek = selectedWeekStart.value === weekStart;
+  const isSameDate = selectedDate.value === day.date;
+
+  selectedWeekStart.value = weekStart;
+
+  if (!isSameWeek) {
+    selectedDate.value = '';
+    return;
+  }
+
+  selectedDate.value = isSameDate ? '' : day.date;
 };
 
 const shiftMonth = (offset: number) => {
   const next = new Date(currentYear.value, currentMonth.value + offset, 1);
   currentYear.value = next.getFullYear();
   currentMonth.value = next.getMonth();
+
+  const firstVisible = new Date(currentYear.value, currentMonth.value, 1);
+  selectedWeekStart.value = formatDate(getWeekStart(firstVisible));
+  selectedDate.value = '';
+};
+
+const selectInitialWeek = (list: any[]) => {
+  const todayWeekStart = formatDate(getWeekStart(today));
+  selectedWeekStart.value = todayWeekStart;
+  selectedDate.value = '';
+
+  const hasThisWeekProject = list.some((item) => {
+    const date = projectDate(item);
+    return date >= todayWeekStart && date <= getWeekEnd(todayWeekStart);
+  });
+
+  if (hasThisWeekProject) return;
+
+  const first = list[0];
+  if (!first) return;
+  const firstDate = projectDate(first);
+  const parsed = parseDate(firstDate);
+  if (Number.isNaN(parsed.getTime())) return;
+
+  currentYear.value = parsed.getFullYear();
+  currentMonth.value = parsed.getMonth();
+  selectedWeekStart.value = formatDate(getWeekStart(parsed));
 };
 
 const fetchProjects = async () => {
@@ -141,15 +253,7 @@ const fetchProjects = async () => {
   try {
     const list = await getProjects();
     projects.value = list;
-    if (list.length && !list.some((item) => projectDate(item) === selectedDate.value)) {
-      const first = list[0];
-      selectedDate.value = projectDate(first);
-      const date = new Date(selectedDate.value);
-      if (!Number.isNaN(date.getTime())) {
-        currentYear.value = date.getFullYear();
-        currentMonth.value = date.getMonth();
-      }
-    }
+    if (!selectedWeekStart.value) selectInitialWeek(list);
   } catch (err) {
     console.error('Fetch projects failed', err);
     uni.showToast({ title: '档期加载失败', icon: 'none' });
@@ -243,17 +347,47 @@ onShow(() => {
 .date-cell {
   position: relative;
   z-index: 1;
-  height: 62rpx;
+  height: 70rpx;
   color: $text-primary;
   font-size: 27rpx;
-  line-height: 62rpx;
+  line-height: 70rpx;
+}
+
+.date-cell::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8rpx;
+  bottom: 8rpx;
+  background: transparent;
+  z-index: -1;
+}
+
+.date-cell.selected-week::before {
+  background: rgba(31, 78, 95, 0.08);
+}
+
+.date-cell.week-start::before {
+  left: 8rpx;
+  border-radius: 999rpx 0 0 999rpx;
+}
+
+.date-cell.week-end::before {
+  right: 8rpx;
+  border-radius: 0 999rpx 999rpx 0;
 }
 
 .date-cell.muted {
   color: rgba(131, 148, 166, 0.72);
 }
 
-.date-cell.selected text {
+.date-cell text {
+  position: relative;
+  z-index: 1;
+}
+
+.date-cell.selected-day text {
   display: inline-flex;
   width: 52rpx;
   height: 52rpx;
@@ -265,22 +399,46 @@ onShow(() => {
   box-shadow: 0 8rpx 18rpx rgba(9, 86, 140, 0.18);
 }
 
-.day-dot {
+.day-count {
   position: absolute;
   left: 50%;
-  bottom: 4rpx;
-  width: 8rpx;
-  height: 8rpx;
-  margin-left: -4rpx;
-  border-radius: 50%;
+  bottom: 2rpx;
+  min-width: 12rpx;
+  height: 12rpx;
+  padding: 0 4rpx;
+  margin-left: -8rpx;
+  border-radius: 999rpx;
+  color: transparent;
+  font-size: 0;
 }
 
-.day-dot.green {
+.day-count.green {
   background: $green;
 }
 
-.day-dot.amber {
+.day-count.amber {
   background: $amber;
+}
+
+.selection-summary {
+  margin: 28rpx 8rpx 18rpx;
+}
+
+.summary-title,
+.summary-subtitle {
+  display: block;
+}
+
+.summary-title {
+  color: $text-primary;
+  font-size: 32rpx;
+  font-weight: 800;
+}
+
+.summary-subtitle {
+  margin-top: 8rpx;
+  color: $text-secondary;
+  font-size: 24rpx;
 }
 
 .state-card {
