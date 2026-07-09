@@ -50,29 +50,36 @@
       </view>
 
       <view class="section-block">
+        <view class="block-title">教案状态</view>
+        <view class="lesson-card">
+          <view class="lesson-head">
+            <view>
+              <text class="lesson-title">{{ lessonTitle }}</text>
+              <text class="lesson-meta">{{ lessonMeta }}</text>
+            </view>
+            <text class="pill" :class="lessonStatusTone">{{ lessonStatusText }}</text>
+          </view>
+          <view v-if="project.lesson_plan" class="lesson-action" @click="viewLessonPlan">查阅教案</view>
+          <text v-else class="lesson-empty">负责人认领后提交教案，成员可在这里查看提交状态。</text>
+        </view>
+      </view>
+
+      <view class="section-block">
         <view class="block-title">岗位认领 · {{ filledCount }}/{{ totalCount }} 已满</view>
         <view v-if="slots.length === 0" class="state-card compact">暂无辅助岗位</view>
         <view class="slot-card" v-for="slot in slots" :key="slot.uid">
           <image class="member-avatar" :src="slot.avatar || defaultAvatar" />
           <view class="slot-copy">
             <text class="member-name">{{ slot.name }}</text>
-            <text class="member-role">{{ slot.role }}{{ slot.isMine && slot.canCancel ? ' · 10 分钟内可取消' : '' }}</text>
+            <text class="member-role">{{ slot.role }}{{ slot.hint }}</text>
           </view>
           <view
             class="slot-action"
-            :class="{ disabled: slot.disabled, cancel: slot.canCancel }"
+            :class="{ disabled: slot.disabled, cancel: slot.canCancel, contact: slot.contactAdmin }"
             @click="handleSlotAction(slot)"
           >
             {{ slot.actionText }}
           </view>
-        </view>
-      </view>
-
-      <view v-if="project.lesson_plan" class="section-block">
-        <view class="block-title">已提交教案</view>
-        <view class="lesson-card">
-          <text class="lesson-title">{{ project.lesson_plan.title }}</text>
-          <text class="lesson-meta">{{ project.lesson_plan.file_name }} · {{ project.lesson_plan.size }}</text>
         </view>
       </view>
 
@@ -86,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { onLoad, onShow } from '@dcloudio/uni-app';
 import { cancelPosition, claimPosition, claimProjectLeader, getProjectDetail } from '@/api/project';
 import { getErrorMessage } from '@/constants/errors';
@@ -100,7 +107,9 @@ const loading = ref(true);
 const claiming = ref(false);
 const projectId = ref('');
 const showCancelTip = ref(false);
+const clockTick = ref(Date.now());
 const defaultAvatar = '/static/logo.png';
+let clockTimer: ReturnType<typeof setInterval> | null = null;
 
 const statusMap: Record<string, { text: string; klass: string }> = {
   pending_claim: { text: '待认领', klass: 'amber' },
@@ -110,6 +119,13 @@ const statusMap: Record<string, { text: string; klass: string }> = {
   locked: { text: '已锁定', klass: 'blue' },
   completed: { text: '已完成', klass: 'blue' },
   cancelled: { text: '已取消', klass: 'blue' }
+};
+
+const lessonStatusMap: Record<string, { text: string; klass: string }> = {
+  not_submitted: { text: '未提交', klass: 'amber' },
+  pending_review: { text: '待审核', klass: 'amber' },
+  approved: { text: '已通过', klass: 'green' },
+  rejected: { text: '已驳回', klass: 'red' }
 };
 
 const positionNames: Record<string, string> = {
@@ -137,6 +153,17 @@ const leaderHint = computed(() => {
   return '支协成员 · 已认领';
 });
 
+const lessonStatus = computed(() => project.value?.lesson_status || 'not_submitted');
+const lessonStatusText = computed(() => lessonStatusMap[lessonStatus.value]?.text || '未提交');
+const lessonStatusTone = computed(() => lessonStatusMap[lessonStatus.value]?.klass || 'amber');
+const lessonTitle = computed(() => project.value?.lesson_plan?.title || '暂未提交教案');
+const lessonMeta = computed(() => {
+  const lesson = project.value?.lesson_plan;
+  if (!lesson) return '负责人提交后，可在此查看教案文件信息';
+  const submitter = lesson.submitter_name || project.value?.leader?.name || '负责人';
+  return `${lesson.file_name || '本地测试教案.pdf'} · ${lesson.size || '未知大小'} · 提交人：${submitter}`;
+});
+
 const submitActionText = computed(() => {
   if (project.value?.project_status === 'revision_required') return '修改并重新提交教案';
   if (project.value?.lesson_status === 'pending_review') return '查看/修改教案';
@@ -145,7 +172,7 @@ const submitActionText = computed(() => {
 
 const slots = computed(() => {
   const result: any[] = [];
-  const now = Date.now();
+  const now = clockTick.value;
   Object.entries(project.value?.positions || {})
     .filter(([key]) => key !== 'lecturer')
     .forEach(([key, raw]: any) => {
@@ -153,9 +180,10 @@ const slots = computed(() => {
       const members = raw.members || [];
       for (let i = 0; i < total; i += 1) {
         const member = members[i];
+        const claimed = Boolean(member);
         const isMine = Boolean(member && member.user_id === currentUserId.value);
         const canCancel = Boolean(isMine && now - Number(member.claimed_at || 0) <= CANCEL_WINDOW_MS);
-        const claimed = Boolean(member);
+        const contactAdmin = Boolean(isMine && claimed && !canCancel);
         result.push({
           uid: `${key}-${i}`,
           key,
@@ -165,8 +193,10 @@ const slots = computed(() => {
           claimed,
           isMine,
           canCancel,
-          disabled: claiming.value || (claimed && !canCancel) || (!claimed && !canClaimSupport.value),
-          actionText: claimed ? (canCancel ? '取消' : isMine ? '已锁定' : '已认领') : '认领'
+          contactAdmin,
+          hint: isMine ? (canCancel ? ' · 10 分钟内可取消' : ' · 超过 10 分钟') : '',
+          disabled: claiming.value || (claimed && !canCancel && !contactAdmin) || (!claimed && !canClaimSupport.value),
+          actionText: claimed ? (canCancel ? '取消' : contactAdmin ? '联系管理员取消' : '已认领') : '认领'
         });
       }
     });
@@ -187,6 +217,7 @@ const fetchProjectDetail = async () => {
   loading.value = true;
   try {
     project.value = await getProjectDetail(projectId.value);
+    clockTick.value = Date.now();
   } catch (err) {
     console.error(err);
     project.value = null;
@@ -211,6 +242,10 @@ const handleClaimLeader = async () => {
 
 const handleSlotAction = (slot: any) => {
   if (slot.disabled) return;
+  if (slot.contactAdmin) {
+    showContactAdminTip();
+    return;
+  }
   if (slot.claimed && slot.canCancel) {
     confirmCancelPosition(slot.key);
     return;
@@ -225,6 +260,7 @@ const handleClaimPosition = async (key: string) => {
   try {
     const updated = await claimPosition(project.value._id, key);
     project.value = updated;
+    clockTick.value = Date.now();
     showCancelWindowTip();
     uni.showToast({ title: '认领成功', icon: 'success' });
   } catch (err: any) {
@@ -267,6 +303,26 @@ const showCancelWindowTip = () => {
   }, 5000);
 };
 
+const showContactAdminTip = () => {
+  uni.showModal({
+    title: '请联系管理员',
+    content: '该岗位认领已超过 10 分钟，不能自助取消。请联系管理员协助处理。',
+    showCancel: false,
+    confirmText: '知道了'
+  });
+};
+
+const viewLessonPlan = () => {
+  const lesson = project.value?.lesson_plan;
+  if (!lesson) return;
+  uni.showModal({
+    title: '教案查阅',
+    content: `标题：${lesson.title || project.value.title}\n文件：${lesson.file_name || '本地测试教案.pdf'}\n大小：${lesson.size || '未知大小'}\n状态：${lessonStatusText.value}`,
+    showCancel: false,
+    confirmText: '知道了'
+  });
+};
+
 onLoad((options: any) => {
   projectId.value = options?.id || 'project-1';
   fetchProjectDetail();
@@ -274,6 +330,16 @@ onLoad((options: any) => {
 
 onShow(() => {
   if (projectId.value) fetchProjectDetail();
+});
+
+onMounted(() => {
+  clockTimer = setInterval(() => {
+    clockTick.value = Date.now();
+  }, 30 * 1000);
+});
+
+onUnmounted(() => {
+  if (clockTimer) clearInterval(clockTimer);
 });
 </script>
 
@@ -374,8 +440,16 @@ onShow(() => {
   display: block;
 }
 
+.lesson-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
 .lesson-title,
-.lesson-meta {
+.lesson-meta,
+.lesson-empty {
   display: block;
 }
 
@@ -385,10 +459,26 @@ onShow(() => {
   font-weight: 800;
 }
 
-.lesson-meta {
+.lesson-meta,
+.lesson-empty {
   margin-top: 8rpx;
   color: $text-secondary;
   font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.lesson-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 58rpx;
+  padding: 0 24rpx;
+  margin-top: 20rpx;
+  border-radius: 999rpx;
+  background: rgba(31, 78, 95, 0.08);
+  color: $ink-blue;
+  font-size: 24rpx;
+  font-weight: 700;
 }
 
 .member-avatar {
@@ -436,6 +526,11 @@ onShow(() => {
 .slot-action.cancel {
   background: $red-bg;
   color: $red;
+}
+
+.slot-action.contact {
+  background: $amber-bg;
+  color: #94601d;
 }
 
 .claim-main.disabled,
