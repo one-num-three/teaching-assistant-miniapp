@@ -442,3 +442,86 @@ local server second
 page integration third
 visual polish last
 ```
+
+### H5-First, Mini Program Second
+
+Do not start by debugging every feature directly in WeChat Mini Program runtime. The first implementation pass should use uni-app H5 mode to validate product flow and API behavior quickly.
+
+The project should not be rebuilt as a separate ordinary Vue web app. It should remain a uni-app codebase:
+
+```txt
+uni-app source
+-> first run and debug in H5
+-> then adapt and verify in mp-weixin
+```
+
+Recommended development commands:
+
+```bash
+npm.cmd run dev:h5
+npm.cmd run dev:mp-weixin
+```
+
+Development phases:
+
+```txt
+1. Freeze product flow and API contract.
+2. Build local API server on http://127.0.0.1:3100/api.
+3. Run uni-app in H5 mode.
+4. Complete the full business loop in browser first.
+5. Keep pages calling src/api/* only.
+6. After H5 is stable, run mp-weixin.
+7. Handle WeChat-specific differences.
+8. Later replace local API with production server API.
+```
+
+The full H5 validation loop is:
+
+```txt
+发布档期
+-> 抢占负责人
+-> 提交教案
+-> 审核通过
+-> 招募岗位
+-> 认领岗位
+-> 资料库自动入库
+```
+
+Reasons to avoid starting directly in WeChat runtime:
+
+- Product flow may still change.
+- API contract may still change.
+- WeChat DevTools can cache old compiled output.
+- Local request behavior differs between simulator and real device.
+- Legal domain configuration can block requests.
+- Real-device `127.0.0.1` points to the phone, not the computer.
+- File APIs such as `wx.chooseMessageFile` add unrelated debugging complexity.
+- Mini Program CSS/runtime differences can hide product issues behind platform issues.
+
+Reasons not to build a separate ordinary web app first:
+
+- Routing differs from Mini Program pages.
+- Component behavior differs from uni-app.
+- File upload and preview behavior differs.
+- Navigation and page stack behavior differs.
+- Login and identity behavior differs.
+- Converting a separate web app back into Mini Program would cause avoidable rework.
+
+The intended strategy is:
+
+```txt
+Use uni-app.
+Debug product and API in H5 first.
+Adapt to mp-weixin after the flow is stable.
+```
+
+WeChat-specific adaptation should be a later phase focused on:
+
+- request legal domain configuration.
+- LAN IP testing for real devices.
+- safe area and navigation bar behavior.
+- `wx.chooseMessageFile`.
+- `wx.openDocument`.
+- upload behavior.
+- Mini Program style differences.
+- page stack and navigation constraints.
