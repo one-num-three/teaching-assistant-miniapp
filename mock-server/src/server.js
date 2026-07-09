@@ -103,6 +103,11 @@ async function route(req, res) {
     return ok(res, db.materials.sort((a, b) => b.created_at - a.created_at));
   }
 
+  if (method === 'GET' && pathname === '/api/notifications') {
+    const db = readDb();
+    return ok(res, db.notifications.filter((item) => item.user_id === userId));
+  }
+
   const projectMatch = pathname.match(/^\/api\/projects\/([^/]+)(?:\/([^/]+))?$/);
   if (projectMatch) {
     const projectId = decodeURIComponent(projectMatch[1]);

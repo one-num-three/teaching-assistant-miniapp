@@ -24,32 +24,33 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed } from 'vue';
 
 const props = defineProps<{
-  project: any
-}>()
+  project: any;
+}>();
 
 const statusConfig: Record<string, { text: string; klass: string; tone: string }> = {
   draft: { text: '草稿', klass: 'blue', tone: 'neutral' },
   pending_claim: { text: '待认领', klass: 'amber', tone: 'waiting' },
+  pending_review: { text: '待审核', klass: 'amber', tone: 'waiting' },
   recruiting: { text: '招募中', klass: 'green', tone: 'active' },
   revision_required: { text: '需修改', klass: 'red', tone: 'waiting' },
   locked: { text: '已锁定', klass: 'blue', tone: 'neutral' },
   completed: { text: '已完成', klass: 'green', tone: 'neutral' },
   cancelled: { text: '已取消', klass: 'blue', tone: 'neutral' }
-}
+};
 
-const config = computed(() => statusConfig[props.project.project_status] || statusConfig.pending_claim)
-const statusText = computed(() => config.value.text)
-const statusClass = computed(() => config.value.klass)
-const cardTone = computed(() => config.value.tone)
+const config = computed(() => statusConfig[props.project.project_status] || statusConfig.pending_claim);
+const statusText = computed(() => config.value.text);
+const statusClass = computed(() => config.value.klass);
+const cardTone = computed(() => config.value.tone);
 
 const timeText = computed(() => {
-  const datetime = props.project.datetime || ''
-  if (typeof datetime === 'string') return datetime.replace(/^\d{4}-\d{2}-\d{2}\s*/, '')
-  return '14:00'
-})
+  const datetime = props.project.datetime || '';
+  if (typeof datetime === 'string') return datetime.replace(/^\d{4}-\d{2}-\d{2}\s*/, '');
+  return '14:00';
+});
 
 const positionName: Record<string, string> = {
   lecturer: '主讲',
@@ -57,26 +58,27 @@ const positionName: Record<string, string> = {
   ppt: 'PPT',
   photographer: '摄影',
   logistics: '场务'
-}
+};
 
 const positionSummary = computed(() => {
   return Object.entries(props.project.positions || {})
     .filter(([key]) => key !== 'lecturer')
+    .filter(([, raw]: any) => Number(raw.total || 0) > 0)
     .map(([key, raw]: any) => {
-      const used = raw.members?.length || 0
+      const used = raw.members?.length || 0;
       return {
         key,
         name: positionName[key] || key,
         open: Math.max((raw.total || 0) - used, 0)
-      }
-    })
-})
+      };
+    });
+});
 
 const goToDetail = () => {
   uni.navigateTo({
     url: `/pages/project/detail?id=${props.project._id}`
-  })
-}
+  });
+};
 </script>
 
 <style lang="scss" scoped>

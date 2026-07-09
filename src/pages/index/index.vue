@@ -30,9 +30,9 @@
         </view>
       </view>
 
-      <view class="section-heading">本周安排</view>
+      <view class="section-heading">{{ scheduleTitle }}</view>
       <view v-if="loading" class="state-card">正在加载档期...</view>
-      <view v-else-if="visibleProjects.length === 0" class="state-card">本周暂无支教档期</view>
+      <view v-else-if="visibleProjects.length === 0" class="state-card">当前日期暂无支教档期</view>
       <block v-else>
         <ProjectCard
           v-for="proj in visibleProjects"
@@ -45,144 +45,127 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import ProjectCard from '@/components/ProjectCard.vue'
-import { getProjects } from '@/api/project'
+import { computed, onMounted, ref } from 'vue';
+import { onShow } from '@dcloudio/uni-app';
+import ProjectCard from '@/components/ProjectCard.vue';
+import { getProjects } from '@/api/project';
 
 interface CalendarDay {
-  key: string
-  label: number
-  date: string
-  inMonth: boolean
-  mark?: 'green' | 'amber'
+  key: string;
+  label: number;
+  date: string;
+  inMonth: boolean;
+  mark?: 'green' | 'amber';
 }
 
-const weeks = ['日', '一', '二', '三', '四', '五', '六']
-const today = new Date(2025, 6, 7)
-const currentYear = ref(2025)
-const currentMonth = ref(6)
-const selectedDate = ref('2025-07-07')
-const projects = ref<any[]>([])
-const loading = ref(false)
-
-const sampleProjects = [
-  {
-    _id: 'project-1',
-    title: '趣味科普：地球的呼吸',
-    location: '江宁区东山社区',
-    datetime: '2025-07-05 14:00',
-    project_status: 'recruiting',
-    leader: { user_id: 'u1', name: '王明', avatar: '' },
-    positions: {
-      lecturer: { total: 1, members: [{ user_id: 'u1', name: '王明' }] },
-      ppt: { total: 1, members: [{ user_id: 'u2', name: '李华' }] },
-      assistant: { total: 2, members: [] }
-    }
-  },
-  {
-    _id: 'project-2',
-    title: '古诗诵读与飞花令',
-    location: '建邺区燕然社区',
-    datetime: '2025-07-07 10:00',
-    project_status: 'recruiting',
-    leader: { user_id: 'u3', name: '陈恩', avatar: '' },
-    positions: {
-      lecturer: { total: 1, members: [{ user_id: 'u3', name: '陈恩' }] },
-      assistant: { total: 1, members: [] },
-      ppt: { total: 1, members: [] }
-    }
-  },
-  {
-    _id: 'project-3',
-    title: '红色手工折纸课',
-    location: '雨花台区景明社区',
-    datetime: '2025-07-12 14:00',
-    project_status: 'pending_claim',
-    leader: null,
-    positions: {
-      lecturer: { total: 1, members: [] },
-      assistant: { total: 2, members: [] }
-    }
-  }
-]
+const weeks = ['日', '一', '二', '三', '四', '五', '六'];
+const currentYear = ref(2025);
+const currentMonth = ref(6);
+const selectedDate = ref('2025-07-05');
+const projects = ref<any[]>([]);
+const loading = ref(false);
+let didMount = false;
 
 const formatDate = (date: Date) => {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const projectDate = (project: any) => project.date || String(project.datetime || '').slice(0, 10);
 
 const calendarDays = computed<CalendarDay[]>(() => {
-  const start = new Date(currentYear.value, currentMonth.value, 1)
-  const firstDay = start.getDay()
-  const daysInMonth = new Date(currentYear.value, currentMonth.value + 1, 0).getDate()
-  const prevDays = new Date(currentYear.value, currentMonth.value, 0).getDate()
-  const cells: CalendarDay[] = []
+  const start = new Date(currentYear.value, currentMonth.value, 1);
+  const firstDay = start.getDay();
+  const daysInMonth = new Date(currentYear.value, currentMonth.value + 1, 0).getDate();
+  const prevDays = new Date(currentYear.value, currentMonth.value, 0).getDate();
+  const cells: CalendarDay[] = [];
 
   for (let i = firstDay - 1; i >= 0; i -= 1) {
-    const label = prevDays - i
-    const date = new Date(currentYear.value, currentMonth.value - 1, label)
-    cells.push({ key: `p-${label}`, label, date: formatDate(date), inMonth: false })
+    const label = prevDays - i;
+    const date = new Date(currentYear.value, currentMonth.value - 1, label);
+    cells.push({ key: `p-${label}`, label, date: formatDate(date), inMonth: false });
   }
 
-  const calendarProjects = projects.value.length ? projects.value : sampleProjects
-
   for (let label = 1; label <= daysInMonth; label += 1) {
-    const date = new Date(currentYear.value, currentMonth.value, label)
-    const iso = formatDate(date)
-    const hasProject = calendarProjects.some((item) => item.datetime?.startsWith(iso))
-    const pending = calendarProjects.some((item) => item.datetime?.startsWith(iso) && item.project_status === 'pending_claim')
+    const date = new Date(currentYear.value, currentMonth.value, label);
+    const iso = formatDate(date);
+    const dayProjects = projects.value.filter((item) => projectDate(item) === iso);
+    const hasProject = dayProjects.length > 0;
+    const pending = dayProjects.some((item) => item.project_status === 'pending_claim');
     cells.push({
       key: `c-${label}`,
       label,
       date: iso,
       inMonth: true,
       mark: hasProject ? (pending ? 'amber' : 'green') : undefined
-    })
+    });
   }
 
-  const rest = 42 - cells.length
+  const rest = 42 - cells.length;
   for (let label = 1; label <= rest; label += 1) {
-    const date = new Date(currentYear.value, currentMonth.value + 1, label)
-    cells.push({ key: `n-${label}`, label, date: formatDate(date), inMonth: false })
+    const date = new Date(currentYear.value, currentMonth.value + 1, label);
+    cells.push({ key: `n-${label}`, label, date: formatDate(date), inMonth: false });
   }
 
-  return cells
-})
+  return cells;
+});
 
 const visibleProjects = computed(() => {
-  if (projects.value.length) return projects.value
-  return sampleProjects
-})
+  const exact = projects.value.filter((item) => projectDate(item) === selectedDate.value);
+  if (exact.length) return exact;
+  return projects.value.filter((item) => {
+    const date = projectDate(item);
+    return date.startsWith(`${currentYear.value}-${String(currentMonth.value + 1).padStart(2, '0')}`);
+  });
+});
+
+const scheduleTitle = computed(() => {
+  const hasExact = projects.value.some((item) => projectDate(item) === selectedDate.value);
+  return hasExact ? `${selectedDate.value} 安排` : '本月安排';
+});
 
 const selectDay = (day: CalendarDay) => {
-  selectedDate.value = day.date
-}
+  selectedDate.value = day.date;
+};
 
 const shiftMonth = (offset: number) => {
-  const next = new Date(currentYear.value, currentMonth.value + offset, 1)
-  currentYear.value = next.getFullYear()
-  currentMonth.value = next.getMonth()
-}
+  const next = new Date(currentYear.value, currentMonth.value + offset, 1);
+  currentYear.value = next.getFullYear();
+  currentMonth.value = next.getMonth();
+};
 
 const fetchProjects = async () => {
-  loading.value = true
+  loading.value = true;
   try {
-    const list = await getProjects()
-    projects.value = list.length ? list : sampleProjects
+    const list = await getProjects();
+    projects.value = list;
+    if (list.length && !list.some((item) => projectDate(item) === selectedDate.value)) {
+      const first = list[0];
+      selectedDate.value = projectDate(first);
+      const date = new Date(selectedDate.value);
+      if (!Number.isNaN(date.getTime())) {
+        currentYear.value = date.getFullYear();
+        currentMonth.value = date.getMonth();
+      }
+    }
   } catch (err) {
-    console.error('Fetch projects failed', err)
-    projects.value = sampleProjects
+    console.error('Fetch projects failed', err);
+    uni.showToast({ title: '档期加载失败', icon: 'none' });
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 onMounted(() => {
-  selectedDate.value = formatDate(today)
-  fetchProjects()
-})
+  didMount = true;
+  fetchProjects();
+});
+
+onShow(() => {
+  if (didMount) fetchProjects();
+});
 </script>
 
 <style lang="scss" scoped>

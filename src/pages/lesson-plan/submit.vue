@@ -8,8 +8,8 @@
     </view>
 
     <view class="success-strip">
-      <text class="success-title">已成功认领，记得提交教案</text>
-      <text class="success-sub">本地测试模式会把教案保存到本机缓存，管理员审核后进入资料库。</text>
+      <text class="success-title">{{ guideTitle }}</text>
+      <text class="success-sub">H5 本地调试会把教案保存到本地 mock server，管理员审核通过后自动进入资料库。</text>
     </view>
 
     <view class="project-strip">
@@ -29,8 +29,8 @@
         <text class="field-label">教案文件</text>
         <view class="upload-zone" @click="chooseLessonFile">
           <view class="upload-mark"></view>
-          <text class="upload-title">点击上传教案文件</text>
-          <text class="upload-hint">本地测试可直接使用示例 PDF，正式版支持 Word / PDF / PPT</text>
+          <text class="upload-title">点击选择教案文件</text>
+          <text class="upload-hint">H5 使用模拟文件；微信端后续接入 Word / PDF / PPT 上传</text>
         </view>
 
         <view class="file-card" v-if="selectedFile">
@@ -57,22 +57,33 @@
         </view>
       </view>
 
-      <button class="submit-btn" @click="submitLesson">提交教案（进入审核）</button>
+      <button class="submit-btn" :loading="submitting" :disabled="submitting" @click="submitLesson">
+        提交教案（进入审核）
+      </button>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
+import { onLoad } from '@dcloudio/uni-app';
 import { getProjectDetail, uploadLesson } from '@/api/project';
+import { getErrorMessage } from '@/constants/errors';
 import { chooseFile } from '@/utils/platform';
 
 const projectId = ref('');
 const project = ref<any>(null);
-const lessonTitle = ref('红色手工折纸课：千纸鹤与五角星');
+const lessonTitle = ref('');
+const submitting = ref(false);
 const selectedFile = ref<{ name: string; size: string } | null>({
-  name: '红色手工折纸课教案_终稿.pdf',
+  name: '本地测试教案.pdf',
   size: '2.4 MB'
+});
+
+const guideTitle = computed(() => {
+  if (project.value?.project_status === 'revision_required') return '教案被驳回，请修改后重新提交';
+  if (project.value?.lesson_status === 'pending_review') return '教案已提交，可覆盖更新';
+  return '已成功认领，请提交教案';
 });
 
 const projectStatusText = computed(() => {
@@ -93,6 +104,12 @@ const loadProject = async () => {
   try {
     project.value = await getProjectDetail(projectId.value);
     lessonTitle.value = project.value.lesson_plan?.title || `${project.value.title} 教案`;
+    if (project.value.lesson_plan?.file_name) {
+      selectedFile.value = {
+        name: project.value.lesson_plan.file_name,
+        size: project.value.lesson_plan.size || '2.4 MB'
+      };
+    }
   } catch (err) {
     uni.showToast({ title: '项目不存在', icon: 'none' });
   }
@@ -108,7 +125,7 @@ const chooseLessonFile = async () => {
       size: `${(file.size / 1024 / 1024).toFixed(1)} MB`
     };
   } catch (err) {
-    uni.showToast({ title: '本地测试已保留示例文件', icon: 'none' });
+    uni.showToast({ title: '文件选择失败', icon: 'none' });
   }
 };
 
@@ -125,6 +142,7 @@ const submitLesson = async () => {
     uni.showToast({ title: '请先选择教案文件', icon: 'none' });
     return;
   }
+  submitting.value = true;
   try {
     await uploadLesson(projectId.value, {
       title: lessonTitle.value,
@@ -134,14 +152,14 @@ const submitLesson = async () => {
     uni.showToast({ title: '教案已提交审核', icon: 'success' });
     setTimeout(() => uni.navigateBack(), 800);
   } catch (err: any) {
-    uni.showToast({ title: err.message || '提交失败', icon: 'none' });
+    uni.showToast({ title: getErrorMessage(err?.code, err?.msg || '提交失败'), icon: 'none' });
+  } finally {
+    submitting.value = false;
   }
 };
 
-onMounted(() => {
-  const pages = getCurrentPages();
-  const page = pages[pages.length - 1];
-  projectId.value = (page as any).options?.id || '';
+onLoad((options: any) => {
+  projectId.value = options?.id || '';
   loadProject();
 });
 </script>
@@ -226,6 +244,7 @@ onMounted(() => {
 
 .form-body {
   padding: 34rpx 28rpx;
+  padding-bottom: 150rpx;
 }
 
 .field-block {
@@ -399,6 +418,10 @@ onMounted(() => {
 }
 
 .submit-btn {
+  position: fixed;
+  left: 28rpx;
+  right: 28rpx;
+  bottom: calc(24rpx + env(safe-area-inset-bottom));
   height: 88rpx;
   border-radius: 22rpx;
   background: linear-gradient(135deg, $ink-blue, $ink-blue-deep);

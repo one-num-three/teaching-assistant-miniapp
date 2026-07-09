@@ -4,7 +4,7 @@
     <view class="form-container">
       <view class="header-text">
         <text class="title">完善业务资料</text>
-        <text class="subtitle">请填写真实信息以解锁支教权限</text>
+        <text class="subtitle">填写真实信息后，可参与支教档期认领与岗位协作</text>
       </view>
 
       <uni-forms ref="formRef" :modelValue="formData" :rules="rules">
@@ -33,13 +33,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useUserStore } from '@/stores/user'
-import { updateUserProfile } from '@/api/user'
+import { onMounted, reactive, ref } from 'vue';
+import { updateUserProfile } from '@/api/user';
+import { useUserStore } from '@/stores/user';
 
-const userStore = useUserStore()
-const formRef = ref()
-const loading = ref(false)
+const userStore = useUserStore();
+const formRef = ref();
+const loading = ref(false);
 
 const formData = reactive({
   name: '',
@@ -47,13 +47,15 @@ const formData = reactive({
   grade: '',
   student_id: '',
   phone: ''
-})
+});
 
 const colleges = [
   { text: '计算机学院', value: '计算机学院' },
   { text: '文学院', value: '文学院' },
-  { text: '理学院', value: '理学院' }
-]
+  { text: '理学院', value: '理学院' },
+  { text: '教育学院', value: '教育学院' },
+  { text: '支教协会', value: '支教协会' }
+];
 
 const grades = [
   { text: '大一', value: '大一' },
@@ -61,65 +63,89 @@ const grades = [
   { text: '大三', value: '大三' },
   { text: '大四', value: '大四' },
   { text: '研究生', value: '研究生' }
-]
+];
 
 const rules = {
   name: { rules: [{ required: true, errorMessage: '请输入姓名' }] },
   college: { rules: [{ required: true, errorMessage: '请选择学院' }] },
   grade: { rules: [{ required: true, errorMessage: '请选择年级' }] },
   phone: { rules: [{ required: true, errorMessage: '请输入手机号' }] }
-}
+};
+
+const hydrateForm = () => {
+  const user = userStore.userInfo;
+  if (!user) return;
+  formData.name = user.name || '';
+  formData.college = user.college || '';
+  formData.grade = user.grade || '';
+  formData.student_id = user.student_id || '';
+  formData.phone = user.phone || '';
+};
 
 const submit = async () => {
   try {
-    await formRef.value.validate()
-    loading.value = true
-    
-    // 调用云函数更新用户信息，并将 roles 加上 'member'
-    const res = await updateUserProfile(formData)
-    
-    // 更新本地 Store
-    userStore.setUser(res)
-    
-    uni.showToast({ title: '认证成功', icon: 'success' })
+    await formRef.value.validate();
+    loading.value = true;
+    const user = await updateUserProfile(formData);
+    userStore.setUser(user);
+    uni.showToast({ title: '认证成功', icon: 'success' });
     setTimeout(() => {
-      uni.navigateBack()
-    }, 1500)
+      uni.navigateBack();
+    }, 800);
   } catch (err: any) {
-    console.error(err)
-    uni.showToast({ title: err.message || '提交失败', icon: 'none' })
+    uni.showToast({ title: err?.msg || err?.message || '提交失败', icon: 'none' });
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
+
+onMounted(hydrateForm);
 </script>
 
 <style lang="scss" scoped>
+.container {
+  min-height: 100vh;
+  padding: 40rpx 28rpx;
+  box-sizing: border-box;
+  background: #f2f4f8;
+}
+
 .form-container {
   margin-top: 60rpx;
   background-color: #fff;
   border-radius: 24rpx;
   padding: 40rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.05);
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.05);
+}
 
-  .header-text {
-    margin-bottom: 60rpx;
-    display: flex;
-    flex-direction: column;
-    .title {
-      font-size: 36rpx;
-      font-weight: bold;
-      color: #333;
-      margin-bottom: 10rpx;
-    }
-    .subtitle {
-      font-size: 24rpx;
-      color: #999;
-    }
-  }
+.header-text {
+  margin-bottom: 60rpx;
+  display: flex;
+  flex-direction: column;
+}
 
-  .btn-group {
-    margin-top: 60rpx;
-  }
+.title {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10rpx;
+}
+
+.subtitle {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.btn-group {
+  margin-top: 60rpx;
+}
+
+.uni-button {
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 18rpx;
+  background: #09568c;
+  color: #fff;
+  font-weight: 700;
 }
 </style>

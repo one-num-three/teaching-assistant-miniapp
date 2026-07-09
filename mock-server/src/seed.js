@@ -117,6 +117,8 @@ function createSeedDb() {
         created_at: now - 120000000
       }
     ],
+    project_claims: [],
+    lesson_reviews: [],
     notifications: []
   };
 }

@@ -41,9 +41,9 @@
           <image class="member-avatar" :src="project.leader?.avatar || defaultAvatar" />
           <view>
             <text class="member-name">{{ project.leader?.name || '待认领' }}</text>
-            <text class="member-role">{{ project.leader?.name ? '支协成员 · 已中标' : '抢占档期后提交教案' }}</text>
+            <text class="member-role">{{ project.leader?.name ? '支协成员 · 已认领' : '抢占档期后提交教案' }}</text>
           </view>
-          <button v-if="!project.leader?.name" class="claim-main" :disabled="claiming" @click="handleClaimLeader">
+          <button v-if="canClaimLeader" class="claim-main" :disabled="claiming" @click="handleClaimLeader">
             抢占
           </button>
         </view>
@@ -51,6 +51,7 @@
 
       <view class="section-block">
         <view class="block-title">岗位认领 · {{ filledCount }}/{{ totalCount }} 已满</view>
+        <view v-if="slots.length === 0" class="state-card compact">暂无辅助岗位</view>
         <view class="slot-card" v-for="slot in slots" :key="slot.uid">
           <image class="member-avatar" :src="slot.avatar || defaultAvatar" />
           <view class="slot-copy">
@@ -59,8 +60,8 @@
           </view>
           <button
             class="slot-action"
-            :class="{ disabled: slot.claimed }"
-            :disabled="slot.claimed || claiming"
+            :class="{ disabled: slot.claimed || !canClaimSupport }"
+            :disabled="slot.claimed || !canClaimSupport || claiming"
             @click="handleClaimPosition(slot.key)"
           >
             {{ slot.claimed ? '已认领' : '认领' }}
@@ -68,14 +69,24 @@
         </view>
       </view>
 
-      <button v-if="isLeader" class="bottom-action" @click="goSubmit">提交/修改教案</button>
+      <view v-if="project.lesson_plan" class="section-block">
+        <view class="block-title">已提交教案</view>
+        <view class="lesson-card">
+          <text class="lesson-title">{{ project.lesson_plan.title }}</text>
+          <text class="lesson-meta">{{ project.lesson_plan.file_name }} · {{ project.lesson_plan.size }}</text>
+        </view>
+      </view>
+
+      <button v-if="isLeader" class="bottom-action" @click="goSubmit">{{ submitActionText }}</button>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
+import { onLoad, onShow } from '@dcloudio/uni-app';
 import { claimPosition, claimProjectLeader, getProjectDetail } from '@/api/project';
+import { getErrorMessage } from '@/constants/errors';
 import { useUserStore } from '@/stores/user';
 
 const userStore = useUserStore();
@@ -96,7 +107,6 @@ const statusMap: Record<string, { text: string; klass: string }> = {
 };
 
 const positionNames: Record<string, string> = {
-  lecturer: '主讲',
   assistant: '助教',
   ppt: 'PPT',
   photographer: '摄影',
@@ -106,44 +116,53 @@ const positionNames: Record<string, string> = {
 const statusText = computed(() => statusMap[project.value?.project_status]?.text || '待认领');
 const statusClass = computed(() => statusMap[project.value?.project_status]?.klass || 'amber');
 const outline = computed(() => project.value?.outline?.length ? project.value.outline : ['课程导入', '主题讲解', '互动练习', '总结反馈']);
+const canClaimLeader = computed(() => project.value?.project_status === 'pending_claim' && !project.value?.leader);
+const canClaimSupport = computed(() => project.value?.project_status === 'recruiting');
 
 const isLeader = computed(() => {
   const openid = userStore.userInfo?.openid;
-  return openid && project.value?.leader?.user_id === openid;
+  return Boolean(openid && project.value?.leader?.user_id === openid);
+});
+
+const submitActionText = computed(() => {
+  if (project.value?.project_status === 'revision_required') return '修改并重新提交教案';
+  if (project.value?.lesson_status === 'pending_review') return '查看/修改教案';
+  return '提交教案';
 });
 
 const slots = computed(() => {
   const result: any[] = [];
-  Object.entries(project.value?.positions || {}).forEach(([key, raw]: any) => {
-    const total = raw.total || 0;
-    const members = raw.members || [];
-    for (let i = 0; i < total; i += 1) {
-      const member = members[i];
-      result.push({
-        uid: `${key}-${i}`,
-        key,
-        role: positionNames[key] || key,
-        name: member?.name || '等待认领',
-        avatar: member?.avatar || '',
-        claimed: Boolean(member)
-      });
-    }
-  });
+  Object.entries(project.value?.positions || {})
+    .filter(([key]) => key !== 'lecturer')
+    .forEach(([key, raw]: any) => {
+      const total = raw.total || 0;
+      const members = raw.members || [];
+      for (let i = 0; i < total; i += 1) {
+        const member = members[i];
+        result.push({
+          uid: `${key}-${i}`,
+          key,
+          role: positionNames[key] || key,
+          name: member?.name || '等待认领',
+          avatar: member?.avatar || '',
+          claimed: Boolean(member)
+        });
+      }
+    });
   return result;
 });
 
 const totalCount = computed(() => slots.value.length);
 const filledCount = computed(() => slots.value.filter((item) => item.claimed).length);
 
-const goBack = () => {
-  uni.navigateBack();
-};
+const goBack = () => uni.navigateBack();
 
 const goSubmit = () => {
   uni.navigateTo({ url: `/pages/lesson-plan/submit?id=${project.value?._id || projectId.value}` });
 };
 
 const fetchProjectDetail = async () => {
+  if (!projectId.value) return;
   loading.value = true;
   try {
     project.value = await getProjectDetail(projectId.value);
@@ -158,11 +177,11 @@ const fetchProjectDetail = async () => {
 const handleClaimLeader = async () => {
   claiming.value = true;
   try {
-    await claimProjectLeader(project.value._id);
+    const updated = await claimProjectLeader(project.value._id);
+    project.value = updated;
     uni.showToast({ title: '认领成功', icon: 'success' });
-    fetchProjectDetail();
   } catch (err: any) {
-    uni.showToast({ title: err.message || '认领失败', icon: 'none' });
+    uni.showToast({ title: getErrorMessage(err?.code, err?.msg || '认领失败'), icon: 'none' });
   } finally {
     claiming.value = false;
   }
@@ -171,21 +190,23 @@ const handleClaimLeader = async () => {
 const handleClaimPosition = async (key: string) => {
   claiming.value = true;
   try {
-    await claimPosition(project.value._id, key);
+    const updated = await claimPosition(project.value._id, key);
+    project.value = updated;
     uni.showToast({ title: '认领成功', icon: 'success' });
-    fetchProjectDetail();
   } catch (err: any) {
-    uni.showToast({ title: err.message || '认领失败', icon: 'none' });
+    uni.showToast({ title: getErrorMessage(err?.code, err?.msg || '认领失败'), icon: 'none' });
   } finally {
     claiming.value = false;
   }
 };
 
-onMounted(() => {
-  const pages = getCurrentPages();
-  const page = pages[pages.length - 1];
-  projectId.value = (page as any).options?.id || 'project-1';
+onLoad((options: any) => {
+  projectId.value = options?.id || 'project-1';
   fetchProjectDetail();
+});
+
+onShow(() => {
+  if (projectId.value) fetchProjectDetail();
 });
 </script>
 
@@ -265,13 +286,35 @@ onMounted(() => {
 }
 
 .leader-card,
-.slot-card {
+.slot-card,
+.lesson-card {
   @include soft-card;
   display: flex;
   align-items: center;
   gap: 20rpx;
   padding: 22rpx 24rpx;
   margin-bottom: 18rpx;
+}
+
+.lesson-card {
+  display: block;
+}
+
+.lesson-title,
+.lesson-meta {
+  display: block;
+}
+
+.lesson-title {
+  color: $text-primary;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.lesson-meta {
+  margin-top: 8rpx;
+  color: $text-secondary;
+  font-size: 24rpx;
 }
 
 .member-avatar {
@@ -338,5 +381,9 @@ onMounted(() => {
   padding: 48rpx;
   color: $text-secondary;
   text-align: center;
+}
+
+.state-card.compact {
+  padding: 28rpx;
 }
 </style>

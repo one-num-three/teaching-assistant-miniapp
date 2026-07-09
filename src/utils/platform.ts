@@ -1,9 +1,3 @@
-/**
- * 平台环境 API 隔离封装
- * 统一管理微信专用 API，禁止在页面内直接散落 wx.*
- */
-
-// 调用云函数
 export const callCloudFunction = async <T = any>(name: string, data: any = {}): Promise<T> => {
   return new Promise((resolve, reject) => {
     // #ifdef MP-WEIXIN
@@ -11,90 +5,80 @@ export const callCloudFunction = async <T = any>(name: string, data: any = {}): 
       name,
       data,
       success: (res: any) => {
-        const result = res.result
+        const result = res.result;
         if (result && result.code === 0) {
-          resolve(result.data as T)
+          resolve(result.data as T);
         } else {
-          // 统一错误处理
-          reject(result || new Error('云函数调用失败'))
+          reject(result || new Error('云函数调用失败'));
         }
       },
-      fail: (err: any) => {
-        reject(err)
-      }
-    })
+      fail: reject
+    });
     // #endif
-    // #ifndef MP-WEIXIN
-    console.warn('非微信环境，暂不支持云函数调用:', name)
-    reject(new Error('非微信环境'))
-    // #endif
-  })
-}
 
-// 选择文件（微信环境专属，从聊天记录选择文件）
+    // #ifndef MP-WEIXIN
+    reject(new Error('H5 本地调试不调用云函数'));
+    // #endif
+  });
+};
+
 export const chooseFile = async (count = 1): Promise<any[]> => {
   return new Promise((resolve, reject) => {
     // #ifdef MP-WEIXIN
     wx.chooseMessageFile({
       count,
-      type: 'file', // 可选 'file', 'image', 'all'
+      type: 'file',
       extension: ['.pdf', '.doc', '.docx', '.ppt', '.pptx'],
-      success: (res: any) => {
-        resolve(res.tempFiles)
-      },
-      fail: (err: any) => {
-        reject(err)
-      }
-    })
+      success: (res: any) => resolve(res.tempFiles),
+      fail: reject
+    });
     // #endif
-    // #ifndef MP-WEIXIN
-    reject(new Error('非微信环境暂不支持从聊天记录选择文件'))
-    // #endif
-  })
-}
 
-// 上传文件到云存储
+    // #ifndef MP-WEIXIN
+    resolve([
+      {
+        name: '本地测试教案.pdf',
+        size: 2.4 * 1024 * 1024,
+        path: 'local://lesson-plan.pdf'
+      }
+    ]);
+    // #endif
+  });
+};
+
 export const uploadFile = async (cloudPath: string, filePath: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     // #ifdef MP-WEIXIN
     wx.cloud.uploadFile({
       cloudPath,
-      filePath, // 文件路径
-      success: (res: any) => {
-        // 返回文件 ID
-        resolve(res.fileID)
-      },
-      fail: (err: any) => {
-        reject(err)
-      }
-    })
+      filePath,
+      success: (res: any) => resolve(res.fileID),
+      fail: reject
+    });
     // #endif
+
     // #ifndef MP-WEIXIN
-    reject(new Error('非微信环境暂不支持云存储'))
+    resolve(`local-file://${cloudPath}`);
     // #endif
-  })
-}
-// 获取临时防盗链下载地址
+  });
+};
+
 export const getTempFileURL = async (fileList: string[]): Promise<any[]> => {
   return new Promise((resolve, reject) => {
     // #ifdef MP-WEIXIN
     wx.cloud.getTempFileURL({
       fileList,
-      success: (res: any) => {
-        resolve(res.fileList)
-      },
-      fail: (err: any) => {
-        reject(err)
-      }
-    })
+      success: (res: any) => resolve(res.fileList),
+      fail: reject
+    });
     // #endif
-    // #ifndef MP-WEIXIN
-    reject(new Error('非微信环境暂不支持获取临时链接'))
-    // #endif
-  })
-}
 
-// 预览文件
+    // #ifndef MP-WEIXIN
+    resolve(fileList.map((fileID) => ({ fileID, tempFileURL: fileID })));
+    // #endif
+  });
+};
+
 export const openDocument = (filePath: string, fileType?: string) => {
   // #ifdef MP-WEIXIN
   wx.openDocument({
@@ -102,9 +86,13 @@ export const openDocument = (filePath: string, fileType?: string) => {
     fileType: fileType as any,
     showMenu: true,
     fail: (err: any) => {
-      uni.showToast({ title: '打开文件失败', icon: 'none' })
-      console.error('openDocument err', err)
+      uni.showToast({ title: '打开文件失败', icon: 'none' });
+      console.error('openDocument err', err);
     }
-  })
+  });
   // #endif
-}
+
+  // #ifndef MP-WEIXIN
+  uni.showToast({ title: 'H5 本地调试使用模拟文件', icon: 'none' });
+  // #endif
+};

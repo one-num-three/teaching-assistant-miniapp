@@ -14,7 +14,8 @@
         <text class="pending-meta">{{ pendingMeta }}</text>
       </view>
 
-      <view v-if="!currentProject" class="state-card">所有教案都已处理</view>
+      <view v-if="loading" class="state-card">正在加载审核列表...</view>
+      <view v-else-if="!currentProject" class="state-card">所有教案都已处理</view>
 
       <block v-else>
         <view class="review-card">
@@ -47,21 +48,21 @@
           </view>
 
           <view class="info-block">
-            <text class="info-label">补充说明</text>
-            <text class="info-value">本地测试审核流：通过后进入招募中，并自动沉淀到资料库；驳回后返回需修改。</text>
+            <text class="info-label">审核说明</text>
+            <text class="info-value">通过后项目进入招募中，并自动沉淀到资料库；驳回后保留负责人，返回需修改，可重新提交。</text>
           </view>
 
           <view class="action-row">
-            <button class="approve" :disabled="loading" @click="approve">通过立项</button>
-            <button class="reject" :disabled="loading" @click="reject">驳回修改</button>
+            <button class="approve" :disabled="submitting" @click="approve">通过立项</button>
+            <button class="reject" :disabled="submitting" @click="reject">驳回修改</button>
           </view>
         </view>
       </block>
 
       <view class="note-card">
-        <text class="card-title">审核说明</text>
-        <text class="note-line">通过：项目立项，进入招募中。</text>
-        <text class="note-line">驳回：保留负责人，返回需修改，可重新提交教案。</text>
+        <text class="card-title">审核规则</text>
+        <text class="note-line">通过：教案状态变为已通过，项目进入招募中或已锁定。</text>
+        <text class="note-line">驳回：项目回到需修改，只允许负责人重新提交教案。</text>
       </view>
 
       <view class="note-card">
@@ -77,10 +78,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { getErrorMessage } from '@/constants/errors';
 import { getReviewProjects, reviewLesson } from '@/api/project';
 
 const pendingProjects = ref<any[]>([]);
 const loading = ref(false);
+const submitting = ref(false);
 
 const currentProject = computed(() => pendingProjects.value[0] || null);
 const pendingMeta = computed(() => {
@@ -109,30 +112,41 @@ const goPublish = () => {
 };
 
 const loadPending = async () => {
-  pendingProjects.value = await getReviewProjects();
-};
-
-const approve = async () => {
-  if (!currentProject.value) return;
   loading.value = true;
   try {
-    await reviewLesson(currentProject.value._id, 'approve');
-    uni.showToast({ title: '已通过', icon: 'success' });
-    await loadPending();
+    pendingProjects.value = await getReviewProjects();
+  } catch (err: any) {
+    uni.showToast({ title: getErrorMessage(err?.code, err?.msg || '加载失败'), icon: 'none' });
   } finally {
     loading.value = false;
   }
 };
 
+const approve = async () => {
+  if (!currentProject.value) return;
+  submitting.value = true;
+  try {
+    await reviewLesson(currentProject.value._id, 'approve');
+    uni.showToast({ title: '已通过', icon: 'success' });
+    await loadPending();
+  } catch (err: any) {
+    uni.showToast({ title: getErrorMessage(err?.code, err?.msg || '审核失败'), icon: 'none' });
+  } finally {
+    submitting.value = false;
+  }
+};
+
 const reject = async () => {
   if (!currentProject.value) return;
-  loading.value = true;
+  submitting.value = true;
   try {
     await reviewLesson(currentProject.value._id, 'reject', '请补充课堂流程和材料清单');
     uni.showToast({ title: '已驳回', icon: 'none' });
     await loadPending();
+  } catch (err: any) {
+    uni.showToast({ title: getErrorMessage(err?.code, err?.msg || '审核失败'), icon: 'none' });
   } finally {
-    loading.value = false;
+    submitting.value = false;
   }
 };
 

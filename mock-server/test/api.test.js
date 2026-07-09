@@ -41,6 +41,9 @@ async function testProjectApprovalCreatesMaterialOnce() {
     afterFirstReview.materials.filter((item) => item.source_project_id === 'project-2').length,
     1
   );
+  assert.strictEqual(afterFirstReview.project_claims.some((item) => item.project_id === 'project-2'), true);
+  assert.strictEqual(afterFirstReview.lesson_reviews.some((item) => item.project_id === 'project-2'), true);
+  assert.strictEqual(afterFirstReview.notifications.some((item) => item.user_id === 'volunteer-1'), true);
 }
 
 async function testSupportPositionCapacity() {

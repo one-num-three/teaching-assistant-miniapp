@@ -94,6 +94,44 @@ function createMaterialFromProject(db, project) {
   });
 }
 
+function pushNotification(db, userId, title, content, projectId) {
+  db.notifications.unshift({
+    _id: `notification-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    user_id: userId,
+    title,
+    content,
+    project_id: projectId,
+    read: false,
+    created_at: Date.now()
+  });
+}
+
+function logClaim(db, project, user, positionKey, action = 'claim') {
+  db.project_claims.unshift({
+    _id: `claim-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    project_id: project._id,
+    project_title: project.title,
+    user_id: user.openid,
+    user_name: user.name,
+    position_key: positionKey,
+    action,
+    created_at: Date.now()
+  });
+}
+
+function logReview(db, project, user, action, comment = '') {
+  db.lesson_reviews.unshift({
+    _id: `review-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    project_id: project._id,
+    project_title: project.title,
+    reviewer_id: user.openid,
+    reviewer_name: user.name,
+    action,
+    comment,
+    created_at: Date.now()
+  });
+}
+
 async function listProjects() {
   const db = readDb();
   return clone(db.projects.sort((a, b) => a.datetime.localeCompare(b.datetime)));
@@ -166,6 +204,8 @@ async function claimLeader(userId, projectId) {
   project.project_status = 'pending_review';
   project.lesson_status = 'not_submitted';
   project.updated_at = Date.now();
+  logClaim(db, project, user, 'lecturer');
+  pushNotification(db, user.openid, '档期认领成功', `你已成为「${project.title}」负责人，请及时提交教案。`, project._id);
 
   await writeDb(db);
   return clone(project);
@@ -195,6 +235,7 @@ async function submitLesson(userId, projectId, payload) {
   project.lesson_status = 'pending_review';
   project.project_status = 'pending_review';
   project.updated_at = Date.now();
+  pushNotification(db, user.openid, '教案已提交审核', `「${project.title}」教案已进入管理员审核。`, project._id);
 
   await writeDb(db);
   return clone(project);
@@ -214,9 +255,17 @@ async function reviewLesson(userId, projectId, payload) {
     project.lesson_status = 'approved';
     project.project_status = isProjectFull(project) ? 'locked' : 'recruiting';
     createMaterialFromProject(db, project);
+    logReview(db, project, user, 'approve', payload.comment || '');
+    if (project.leader?.user_id) {
+      pushNotification(db, project.leader.user_id, '教案审核通过', `「${project.title}」已进入招募流程。`, project._id);
+    }
   } else if (payload.action === 'reject') {
     project.lesson_status = 'rejected';
     project.project_status = 'revision_required';
+    logReview(db, project, user, 'reject', payload.comment || '');
+    if (project.leader?.user_id) {
+      pushNotification(db, project.leader.user_id, '教案需修改', payload.comment || `「${project.title}」教案被驳回，请修改后重新提交。`, project._id);
+    }
   } else {
     throw createError('审核动作无效', 400, 'INVALID_ACTION');
   }
@@ -250,6 +299,8 @@ async function claimPosition(userId, projectId, payload) {
   position.members.push(userSnapshot(user));
   project.project_status = isProjectFull(project) ? 'locked' : 'recruiting';
   project.updated_at = Date.now();
+  logClaim(db, project, user, positionKey);
+  pushNotification(db, user.openid, '岗位认领成功', `你已认领「${project.title}」的${positionKey}岗位。`, project._id);
 
   await writeDb(db);
   return clone(project);
