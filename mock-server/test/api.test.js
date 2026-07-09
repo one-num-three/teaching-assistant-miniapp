@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { resetDb, readDb } = require('../src/services/store');
+const { resetDb, readDb, writeDb } = require('../src/services/store');
 const projectService = require('../src/services/projectService');
 const userService = require('../src/services/userService');
 
@@ -117,11 +117,88 @@ async function testSupportPositionCapacity() {
   assert.strictEqual(project.project_status, 'locked');
 }
 
+async function testSupportPositionCanBeCancelledWithinTenMinutes() {
+  await resetDb();
+  const createdProject = await projectService.publishProject('admin-1', {
+    title: 'cancel position smoke test',
+    date: '2026-07-18',
+    start_time: '14:00',
+    end_time: '15:30',
+    location: 'local test community',
+    target_audience: 'primary students',
+    positions: { assistant: 1 }
+  });
+
+  await projectService.claimLeader('volunteer-1', createdProject._id);
+  await projectService.submitLesson('volunteer-1', createdProject._id, { title: 'cancel position lesson' });
+  await projectService.reviewLesson('admin-1', createdProject._id, { action: 'approve' });
+  await projectService.claimPosition('volunteer-2', createdProject._id, { positionKey: 'assistant' });
+
+  const project = await projectService.cancelPosition('volunteer-2', createdProject._id, {
+    positionKey: 'assistant'
+  });
+
+  assert.strictEqual(project.positions.assistant.members.length, 0);
+  assert.strictEqual(project.project_status, 'recruiting');
+
+  const db = readDb();
+  assert(
+    db.project_claims.some(
+      (item) =>
+        item.project_id === createdProject._id &&
+        item.user_id === 'volunteer-2' &&
+        item.position_key === 'assistant' &&
+        item.action === 'cancel'
+    )
+  );
+}
+
+async function testSupportPositionCancelExpiresAfterTenMinutes() {
+  await resetDb();
+  const createdProject = await projectService.publishProject('admin-1', {
+    title: 'cancel expiry smoke test',
+    date: '2026-07-18',
+    start_time: '14:00',
+    end_time: '15:30',
+    location: 'local test community',
+    target_audience: 'primary students',
+    positions: { assistant: 1 }
+  });
+
+  await projectService.claimLeader('volunteer-1', createdProject._id);
+  await projectService.submitLesson('volunteer-1', createdProject._id, { title: 'cancel expiry lesson' });
+  await projectService.reviewLesson('admin-1', createdProject._id, { action: 'approve' });
+  await projectService.claimPosition('volunteer-2', createdProject._id, { positionKey: 'assistant' });
+
+  const db = readDb();
+  const project = db.projects.find((item) => item._id === createdProject._id);
+  project.positions.assistant.members[0].claimed_at = Date.now() - 11 * 60 * 1000;
+  await writeDb(db);
+
+  await assertRejectsWithCode(
+    () => projectService.cancelPosition('volunteer-2', createdProject._id, { positionKey: 'assistant' }),
+    'CLAIM_CANCEL_EXPIRED'
+  );
+}
+
+async function testLeaderCannotCancelWithPositionCancelEndpoint() {
+  await resetDb();
+  await projectService.claimLeader('volunteer-1', 'project-2');
+
+  await assertRejectsWithCode(
+    () => projectService.cancelPosition('volunteer-1', 'project-2', { positionKey: 'lecturer' }),
+    'INVALID_POSITION'
+  );
+}
+
 async function main() {
   await testUserProfileUpdate();
   await testPublishPermissionAndProjectVisible();
   await testProjectApprovalCreatesMaterialOnce();
   await testSupportPositionCapacity();
+  await testSupportPositionCanBeCancelledWithinTenMinutes();
+  await testSupportPositionCancelExpiresAfterTenMinutes();
+  await testLeaderCannotCancelWithPositionCancelEndpoint();
   await resetDb();
   console.log('mock api tests passed');
 }

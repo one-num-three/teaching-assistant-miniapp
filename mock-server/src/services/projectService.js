@@ -2,6 +2,7 @@ const { clone, readDb, writeDb } = require('./store');
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'reviewer'];
 const POSITION_KEYS = ['assistant', 'ppt', 'photographer', 'logistics'];
+const CLAIM_CANCEL_WINDOW_MS = 10 * 60 * 1000;
 
 function createError(message, status = 500, code = 'ERROR') {
   const err = new Error(message);
@@ -10,7 +11,7 @@ function createError(message, status = 500, code = 'ERROR') {
   return err;
 }
 
-function assertFound(value, message = '资源不存在') {
+function assertFound(value, message = 'Resource not found') {
   if (!value) throw createError(message, 404, 'NOT_FOUND');
   return value;
 }
@@ -18,14 +19,14 @@ function assertFound(value, message = '资源不存在') {
 function getUser(db, userId) {
   return assertFound(
     db.users.find((user) => user.id === userId || user.openid === userId),
-    '用户不存在'
+    'User not found'
   );
 }
 
 function assertAdmin(user) {
   const roles = Array.isArray(user.roles) ? user.roles : [];
   if (!roles.some((role) => ADMIN_ROLES.includes(role))) {
-    throw createError('没有管理员权限', 403, 'NO_PERMISSION');
+    throw createError('No admin permission', 403, 'NO_PERMISSION');
   }
 }
 
@@ -85,8 +86,8 @@ function createMaterialFromProject(db, project) {
     category: 'science',
     type: 'PDF',
     tone: 'blue',
-    tag: '自动沉淀',
-    count: '审核通过教案',
+    tag: 'auto',
+    count: 'approved lesson',
     date: new Date().toISOString().slice(0, 10),
     source_project_id: project._id,
     source_project_title: project.title,
@@ -145,7 +146,7 @@ async function listAdminProjects(userId) {
 
 async function getProject(projectId) {
   const db = readDb();
-  return clone(assertFound(db.projects.find((item) => item._id === projectId), '项目不存在'));
+  return clone(assertFound(db.projects.find((item) => item._id === projectId), 'Project not found'));
 }
 
 async function publishProject(userId, payload) {
@@ -156,7 +157,7 @@ async function publishProject(userId, payload) {
   const required = ['title', 'date', 'start_time', 'end_time', 'location', 'target_audience'];
   for (const key of required) {
     if (!String(payload[key] || '').trim()) {
-      throw createError('档期信息不完整', 400, 'INVALID_PROJECT');
+      throw createError('Project payload is incomplete', 400, 'INVALID_PROJECT');
     }
   }
 
@@ -171,7 +172,7 @@ async function publishProject(userId, payload) {
     target_audience: payload.target_audience,
     outline: Array.isArray(payload.outline) && payload.outline.length
       ? payload.outline
-      : ['课程导入', '主题讲解', '互动练习', '总结反馈'],
+      : ['Course intro', 'Topic teaching', 'Interactive practice', 'Wrap up'],
     project_status: 'pending_claim',
     lesson_status: 'not_submitted',
     leader: null,
@@ -189,13 +190,13 @@ async function publishProject(userId, payload) {
 async function claimLeader(userId, projectId) {
   const db = readDb();
   const user = getUser(db, userId);
-  const project = assertFound(db.projects.find((item) => item._id === projectId), '项目不存在');
+  const project = assertFound(db.projects.find((item) => item._id === projectId), 'Project not found');
 
   if (project.project_status !== 'pending_claim') {
-    throw createError('当前档期不可抢占', 409, 'PROJECT_NOT_CLAIMABLE');
+    throw createError('Project cannot be claimed now', 409, 'PROJECT_NOT_CLAIMABLE');
   }
   if (project.leader) {
-    throw createError('该档期已被认领', 409, 'ALREADY_CLAIMED');
+    throw createError('Project already claimed', 409, 'ALREADY_CLAIMED');
   }
 
   const snapshot = userSnapshot(user);
@@ -205,7 +206,7 @@ async function claimLeader(userId, projectId) {
   project.lesson_status = 'not_submitted';
   project.updated_at = Date.now();
   logClaim(db, project, user, 'lecturer');
-  pushNotification(db, user.openid, '档期认领成功', `你已成为「${project.title}」负责人，请及时提交教案。`, project._id);
+  pushNotification(db, user.openid, 'Project claimed', `You are now the leader of ${project.title}.`, project._id);
 
   await writeDb(db);
   return clone(project);
@@ -214,19 +215,19 @@ async function claimLeader(userId, projectId) {
 async function submitLesson(userId, projectId, payload) {
   const db = readDb();
   const user = getUser(db, userId);
-  const project = assertFound(db.projects.find((item) => item._id === projectId), '项目不存在');
+  const project = assertFound(db.projects.find((item) => item._id === projectId), 'Project not found');
 
   if (!project.leader || project.leader.user_id !== user.openid) {
-    throw createError('只有负责人可以提交教案', 403, 'NO_PERMISSION');
+    throw createError('Only the project leader can submit lesson plan', 403, 'NO_PERMISSION');
   }
   if (!['pending_review', 'revision_required'].includes(project.project_status)) {
-    throw createError('当前状态不可提交教案', 409, 'INVALID_STATUS');
+    throw createError('Current status does not allow lesson submission', 409, 'INVALID_STATUS');
   }
 
   project.lesson_plan = {
-    title: payload.title || `${project.title} 教案`,
+    title: payload.title || `${project.title} lesson plan`,
     file_id: payload.fileId || `local-lesson-${projectId}-${Date.now()}`,
-    file_name: payload.fileName || '本地测试教案.pdf',
+    file_name: payload.fileName || 'local-lesson.pdf',
     size: payload.size || '2.4 MB',
     submitted_at: Date.now(),
     submitter_id: user.openid,
@@ -235,7 +236,7 @@ async function submitLesson(userId, projectId, payload) {
   project.lesson_status = 'pending_review';
   project.project_status = 'pending_review';
   project.updated_at = Date.now();
-  pushNotification(db, user.openid, '教案已提交审核', `「${project.title}」教案已进入管理员审核。`, project._id);
+  pushNotification(db, user.openid, 'Lesson submitted', `${project.title} is waiting for admin review.`, project._id);
 
   await writeDb(db);
   return clone(project);
@@ -246,9 +247,9 @@ async function reviewLesson(userId, projectId, payload) {
   const user = getUser(db, userId);
   assertAdmin(user);
 
-  const project = assertFound(db.projects.find((item) => item._id === projectId), '项目不存在');
+  const project = assertFound(db.projects.find((item) => item._id === projectId), 'Project not found');
   if (project.lesson_status !== 'pending_review') {
-    throw createError('当前没有待审核教案', 409, 'INVALID_STATUS');
+    throw createError('No pending lesson plan', 409, 'INVALID_STATUS');
   }
 
   if (payload.action === 'approve') {
@@ -257,17 +258,17 @@ async function reviewLesson(userId, projectId, payload) {
     createMaterialFromProject(db, project);
     logReview(db, project, user, 'approve', payload.comment || '');
     if (project.leader?.user_id) {
-      pushNotification(db, project.leader.user_id, '教案审核通过', `「${project.title}」已进入招募流程。`, project._id);
+      pushNotification(db, project.leader.user_id, 'Lesson approved', `${project.title} is now recruiting.`, project._id);
     }
   } else if (payload.action === 'reject') {
     project.lesson_status = 'rejected';
     project.project_status = 'revision_required';
     logReview(db, project, user, 'reject', payload.comment || '');
     if (project.leader?.user_id) {
-      pushNotification(db, project.leader.user_id, '教案需修改', payload.comment || `「${project.title}」教案被驳回，请修改后重新提交。`, project._id);
+      pushNotification(db, project.leader.user_id, 'Lesson needs revision', payload.comment || `${project.title} needs revision.`, project._id);
     }
   } else {
-    throw createError('审核动作无效', 400, 'INVALID_ACTION');
+    throw createError('Invalid review action', 400, 'INVALID_ACTION');
   }
 
   project.updated_at = Date.now();
@@ -278,35 +279,74 @@ async function reviewLesson(userId, projectId, payload) {
 async function claimPosition(userId, projectId, payload) {
   const db = readDb();
   const user = getUser(db, userId);
-  const project = assertFound(db.projects.find((item) => item._id === projectId), '项目不存在');
+  const project = assertFound(db.projects.find((item) => item._id === projectId), 'Project not found');
   const positionKey = payload.positionKey;
 
   if (project.project_status !== 'recruiting') {
-    throw createError('当前状态不可认领岗位', 409, 'INVALID_STATUS');
+    throw createError('Current status does not allow position claiming', 409, 'INVALID_STATUS');
   }
 
   const position = project.positions[positionKey];
   if (!position || Number(position.total) <= 0) {
-    throw createError('岗位不存在或无需认领', 400, 'INVALID_POSITION');
+    throw createError('Position not found or not open', 400, 'INVALID_POSITION');
   }
   if (hasClaimedAnyRole(project, user.openid)) {
-    throw createError('你已经认领过该项目', 409, 'ALREADY_CLAIMED');
+    throw createError('You already claimed a role in this project', 409, 'ALREADY_CLAIMED');
   }
   if (position.members.length >= position.total) {
-    throw createError('该岗位已满', 409, 'PROJECT_FULL');
+    throw createError('Position is full', 409, 'PROJECT_FULL');
   }
 
   position.members.push(userSnapshot(user));
   project.project_status = isProjectFull(project) ? 'locked' : 'recruiting';
   project.updated_at = Date.now();
   logClaim(db, project, user, positionKey);
-  pushNotification(db, user.openid, '岗位认领成功', `你已认领「${project.title}」的${positionKey}岗位。`, project._id);
+  pushNotification(db, user.openid, 'Position claimed', `You claimed ${project.title} / ${positionKey}. You can cancel within 10 minutes.`, project._id);
+
+  await writeDb(db);
+  return clone(project);
+}
+
+async function cancelPosition(userId, projectId, payload) {
+  const db = readDb();
+  const user = getUser(db, userId);
+  const project = assertFound(db.projects.find((item) => item._id === projectId), 'Project not found');
+  const positionKey = payload.positionKey;
+
+  if (!POSITION_KEYS.includes(positionKey)) {
+    throw createError('Only support positions can be cancelled', 400, 'INVALID_POSITION');
+  }
+  if (!['recruiting', 'locked'].includes(project.project_status)) {
+    throw createError('Current project status does not allow cancellation', 409, 'INVALID_STATUS');
+  }
+
+  const position = project.positions[positionKey];
+  if (!position || Number(position.total) <= 0) {
+    throw createError('Position not found or not open', 400, 'INVALID_POSITION');
+  }
+
+  const memberIndex = position.members.findIndex((member) => member.user_id === user.openid);
+  if (memberIndex < 0) {
+    throw createError('You have not claimed this position', 409, 'NOT_CLAIMED');
+  }
+
+  const member = position.members[memberIndex];
+  if (Date.now() - Number(member.claimed_at || 0) > CLAIM_CANCEL_WINDOW_MS) {
+    throw createError('Claim cancellation window has expired', 409, 'CLAIM_CANCEL_EXPIRED');
+  }
+
+  position.members.splice(memberIndex, 1);
+  project.project_status = 'recruiting';
+  project.updated_at = Date.now();
+  logClaim(db, project, user, positionKey, 'cancel');
+  pushNotification(db, user.openid, 'Position cancelled', `You cancelled ${project.title} / ${positionKey}.`, project._id);
 
   await writeDb(db);
   return clone(project);
 }
 
 module.exports = {
+  cancelPosition,
   claimLeader,
   claimPosition,
   getProject,

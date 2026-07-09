@@ -28,6 +28,13 @@ export const claimPosition = async (projectId: string, positionKey: string): Pro
   });
 };
 
+export const cancelPosition = async (projectId: string, positionKey: string): Promise<any> => {
+  return request<any>(`/projects/${projectId}/cancel-position`, {
+    method: 'POST',
+    data: { positionKey }
+  });
+};
+
 export const uploadLesson = async (projectId: string, payload: any): Promise<any> => {
   return request<any>(`/projects/${projectId}/submit-lesson`, {
     method: 'POST',

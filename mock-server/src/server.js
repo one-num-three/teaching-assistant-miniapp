@@ -154,6 +154,9 @@ async function route(req, res) {
     if (method === 'POST' && action === 'claim-position') {
       return ok(res, await projectService.claimPosition(userId, projectId, await readBody(req)));
     }
+    if (method === 'POST' && action === 'cancel-position') {
+      return ok(res, await projectService.cancelPosition(userId, projectId, await readBody(req)));
+    }
   }
 
   return fail(res, Object.assign(new Error('接口不存在'), { status: 404, code: 'NOT_FOUND' }));

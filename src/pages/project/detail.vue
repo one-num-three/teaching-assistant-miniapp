@@ -39,13 +39,13 @@
         <view class="block-title">项目负责人</view>
         <view class="leader-card">
           <image class="member-avatar" :src="project.leader?.avatar || defaultAvatar" />
-          <view>
+          <view class="leader-copy">
             <text class="member-name">{{ project.leader?.name || '待认领' }}</text>
-            <text class="member-role">{{ project.leader?.name ? '支协成员 · 已认领' : '抢占档期后提交教案' }}</text>
+            <text class="member-role">{{ leaderHint }}</text>
           </view>
-          <button v-if="canClaimLeader" class="claim-main" :disabled="claiming" @click="handleClaimLeader">
+          <view v-if="canClaimLeader" class="claim-main" :class="{ disabled: claiming }" @click="handleClaimLeader">
             抢占
-          </button>
+          </view>
         </view>
       </view>
 
@@ -56,16 +56,15 @@
           <image class="member-avatar" :src="slot.avatar || defaultAvatar" />
           <view class="slot-copy">
             <text class="member-name">{{ slot.name }}</text>
-            <text class="member-role">{{ slot.role }}</text>
+            <text class="member-role">{{ slot.role }}{{ slot.isMine && slot.canCancel ? ' · 10 分钟内可取消' : '' }}</text>
           </view>
-          <button
+          <view
             class="slot-action"
-            :class="{ disabled: slot.claimed || !canClaimSupport }"
-            :disabled="slot.claimed || !canClaimSupport || claiming"
-            @click="handleClaimPosition(slot.key)"
+            :class="{ disabled: slot.disabled, cancel: slot.canCancel }"
+            @click="handleSlotAction(slot)"
           >
-            {{ slot.claimed ? '已认领' : '认领' }}
-          </button>
+            {{ slot.actionText }}
+          </view>
         </view>
       </view>
 
@@ -77,6 +76,10 @@
         </view>
       </view>
 
+      <view v-if="showCancelTip" class="cancel-tip">
+        <text>已认领成功，10 分钟内可随时取消；超过后请联系管理员处理。</text>
+      </view>
+
       <button v-if="isLeader" class="bottom-action" @click="goSubmit">{{ submitActionText }}</button>
     </view>
   </view>
@@ -85,15 +88,18 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { onLoad, onShow } from '@dcloudio/uni-app';
-import { claimPosition, claimProjectLeader, getProjectDetail } from '@/api/project';
+import { cancelPosition, claimPosition, claimProjectLeader, getProjectDetail } from '@/api/project';
 import { getErrorMessage } from '@/constants/errors';
 import { useUserStore } from '@/stores/user';
+
+const CANCEL_WINDOW_MS = 10 * 60 * 1000;
 
 const userStore = useUserStore();
 const project = ref<any>(null);
 const loading = ref(true);
 const claiming = ref(false);
 const projectId = ref('');
+const showCancelTip = ref(false);
 const defaultAvatar = '/static/logo.png';
 
 const statusMap: Record<string, { text: string; klass: string }> = {
@@ -113,6 +119,7 @@ const positionNames: Record<string, string> = {
   logistics: '场务'
 };
 
+const currentUserId = computed(() => userStore.userInfo?.openid || '');
 const statusText = computed(() => statusMap[project.value?.project_status]?.text || '待认领');
 const statusClass = computed(() => statusMap[project.value?.project_status]?.klass || 'amber');
 const outline = computed(() => project.value?.outline?.length ? project.value.outline : ['课程导入', '主题讲解', '互动练习', '总结反馈']);
@@ -120,8 +127,14 @@ const canClaimLeader = computed(() => project.value?.project_status === 'pending
 const canClaimSupport = computed(() => project.value?.project_status === 'recruiting');
 
 const isLeader = computed(() => {
-  const openid = userStore.userInfo?.openid;
+  const openid = currentUserId.value;
   return Boolean(openid && project.value?.leader?.user_id === openid);
+});
+
+const leaderHint = computed(() => {
+  if (!project.value?.leader?.name) return '抢占档期后提交教案';
+  if (isLeader.value) return '负责人已锁定，如需退出请联系管理员';
+  return '支协成员 · 已认领';
 });
 
 const submitActionText = computed(() => {
@@ -132,6 +145,7 @@ const submitActionText = computed(() => {
 
 const slots = computed(() => {
   const result: any[] = [];
+  const now = Date.now();
   Object.entries(project.value?.positions || {})
     .filter(([key]) => key !== 'lecturer')
     .forEach(([key, raw]: any) => {
@@ -139,13 +153,20 @@ const slots = computed(() => {
       const members = raw.members || [];
       for (let i = 0; i < total; i += 1) {
         const member = members[i];
+        const isMine = Boolean(member && member.user_id === currentUserId.value);
+        const canCancel = Boolean(isMine && now - Number(member.claimed_at || 0) <= CANCEL_WINDOW_MS);
+        const claimed = Boolean(member);
         result.push({
           uid: `${key}-${i}`,
           key,
           role: positionNames[key] || key,
           name: member?.name || '等待认领',
           avatar: member?.avatar || '',
-          claimed: Boolean(member)
+          claimed,
+          isMine,
+          canCancel,
+          disabled: claiming.value || (claimed && !canCancel) || (!claimed && !canClaimSupport.value),
+          actionText: claimed ? (canCancel ? '取消' : isMine ? '已锁定' : '已认领') : '认领'
         });
       }
     });
@@ -175,15 +196,27 @@ const fetchProjectDetail = async () => {
 };
 
 const handleClaimLeader = async () => {
+  if (claiming.value || !canClaimLeader.value) return;
   claiming.value = true;
   try {
     const updated = await claimProjectLeader(project.value._id);
     project.value = updated;
     uni.showToast({ title: '认领成功', icon: 'success' });
   } catch (err: any) {
-    uni.showToast({ title: getErrorMessage(err?.code, err?.msg || '认领失败'), icon: 'none' });
+    uni.showToast({ title: getErrorMessage(err?.code, err?.message || '认领失败'), icon: 'none' });
   } finally {
     claiming.value = false;
+  }
+};
+
+const handleSlotAction = (slot: any) => {
+  if (slot.disabled) return;
+  if (slot.claimed && slot.canCancel) {
+    confirmCancelPosition(slot.key);
+    return;
+  }
+  if (!slot.claimed) {
+    handleClaimPosition(slot.key);
   }
 };
 
@@ -192,12 +225,46 @@ const handleClaimPosition = async (key: string) => {
   try {
     const updated = await claimPosition(project.value._id, key);
     project.value = updated;
+    showCancelWindowTip();
     uni.showToast({ title: '认领成功', icon: 'success' });
   } catch (err: any) {
-    uni.showToast({ title: getErrorMessage(err?.code, err?.msg || '认领失败'), icon: 'none' });
+    uni.showToast({ title: getErrorMessage(err?.code, err?.message || '认领失败'), icon: 'none' });
   } finally {
     claiming.value = false;
   }
+};
+
+const confirmCancelPosition = (key: string) => {
+  uni.showModal({
+    title: '取消认领',
+    content: '确认取消该岗位吗？取消后其他成员可以继续认领。',
+    confirmText: '取消认领',
+    confirmColor: '#C0392B',
+    success: (res) => {
+      if (res.confirm) handleCancelPosition(key);
+    }
+  });
+};
+
+const handleCancelPosition = async (key: string) => {
+  claiming.value = true;
+  try {
+    const updated = await cancelPosition(project.value._id, key);
+    project.value = updated;
+    showCancelTip.value = false;
+    uni.showToast({ title: '已取消认领', icon: 'none' });
+  } catch (err: any) {
+    uni.showToast({ title: getErrorMessage(err?.code, err?.message || '取消失败'), icon: 'none' });
+  } finally {
+    claiming.value = false;
+  }
+};
+
+const showCancelWindowTip = () => {
+  showCancelTip.value = true;
+  setTimeout(() => {
+    showCancelTip.value = false;
+  }, 5000);
 };
 
 onLoad((options: any) => {
@@ -220,8 +287,15 @@ onShow(() => {
   box-sizing: border-box;
 }
 
+.nav-back {
+  position: absolute;
+  left: 0;
+  font-size: 48rpx;
+  line-height: 1;
+}
+
 .detail-content {
-  padding-bottom: 140rpx;
+  padding-bottom: 160rpx;
 }
 
 .hero-detail {
@@ -324,6 +398,11 @@ onShow(() => {
   background: rgba(31, 78, 95, 0.08);
 }
 
+.leader-copy,
+.slot-copy {
+  flex: 1;
+}
+
 .member-name,
 .member-role {
   display: block;
@@ -343,23 +422,26 @@ onShow(() => {
 
 .claim-main,
 .slot-action {
-  margin-left: auto;
   min-width: 108rpx;
   height: 54rpx;
+  line-height: 54rpx;
   padding: 0 20rpx;
   border-radius: 999rpx;
   background: $ink-blue;
   color: #fff;
   font-size: 24rpx;
+  text-align: center;
 }
 
+.slot-action.cancel {
+  background: $red-bg;
+  color: $red;
+}
+
+.claim-main.disabled,
 .slot-action.disabled {
   background: rgba(31, 78, 95, 0.08);
   color: $text-muted;
-}
-
-.slot-copy {
-  flex: 1;
 }
 
 .bottom-action {
@@ -373,6 +455,21 @@ onShow(() => {
   color: #fff;
   font-size: 30rpx;
   font-weight: 700;
+  box-shadow: 0 16rpx 30rpx rgba(15, 47, 61, 0.22);
+}
+
+.cancel-tip {
+  position: fixed;
+  left: 28rpx;
+  right: 28rpx;
+  bottom: calc(126rpx + env(safe-area-inset-bottom));
+  z-index: 10;
+  padding: 22rpx 26rpx;
+  border-radius: 18rpx;
+  background: rgba(15, 47, 61, 0.92);
+  color: #fff;
+  font-size: 25rpx;
+  line-height: 1.5;
   box-shadow: 0 16rpx 30rpx rgba(15, 47, 61, 0.22);
 }
 
