@@ -8,7 +8,7 @@
       <view class="profile-row">
         <image class="avatar" :src="userInfo?.avatar || defaultAvatar" />
         <view class="profile-copy">
-          <text class="name">{{ userInfo?.name || '陈恩' }}</text>
+          <text class="name">{{ userInfo?.name || '未登录用户' }}</text>
           <text class="role">{{ roleLine }}</text>
         </view>
       </view>
@@ -17,16 +17,36 @@
     <view class="content-layer safe-bottom">
       <view class="stats-card">
         <view class="stat-item">
-          <text class="num">{{ userInfo?.stats?.joined_projects || 12 }}</text>
+          <text class="num">{{ userInfo?.stats?.joined_projects || 0 }}</text>
           <text class="label">参与项目</text>
         </view>
         <view class="stat-item">
-          <text class="num">{{ userInfo?.stats?.volunteer_hours || 48 }}</text>
+          <text class="num">{{ userInfo?.stats?.volunteer_hours || 0 }}</text>
           <text class="label">志愿时长/h</text>
         </view>
         <view class="stat-item">
-          <text class="num">{{ userInfo?.stats?.leader_count || 3 }}</text>
+          <text class="num">{{ userInfo?.stats?.leader_count || 0 }}</text>
           <text class="label">带队次数</text>
+        </view>
+      </view>
+
+      <view class="dev-panel">
+        <view class="section-row">
+          <text class="section-title-small">本地调试</text>
+          <text class="dev-current">{{ userInfo?.openid || '未选择' }}</text>
+        </view>
+        <view class="dev-actions">
+          <button
+            v-for="item in devUsers"
+            :key="item.id"
+            class="dev-btn"
+            :class="{ active: activeUserId === item.id }"
+            size="mini"
+            @click="switchUser(item.id)"
+          >
+            {{ item.label }}
+          </button>
+          <button class="dev-btn danger" size="mini" @click="resetData">重置数据</button>
         </view>
       </view>
 
@@ -90,31 +110,60 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useUserStore } from '@/stores/user'
+import { computed } from 'vue';
+import { login, resetDevData, switchDevUser } from '@/api/user';
+import { useUserStore } from '@/stores/user';
 
-const userStore = useUserStore()
-const userInfo = computed(() => userStore.userInfo)
-const defaultAvatar = '/static/logo.png'
-const showAdminEntry = computed(() => userStore.isAdmin)
+const userStore = useUserStore();
+const userInfo = computed(() => userStore.userInfo);
+const defaultAvatar = '/static/logo.png';
+const showAdminEntry = computed(() => userStore.isAdmin);
+const activeUserId = computed(() => userInfo.value?.openid || '');
+
+const devUsers = [
+  { id: 'admin-1', label: '管理员' },
+  { id: 'volunteer-1', label: '志愿者A' },
+  { id: 'volunteer-2', label: '志愿者B' }
+];
 
 const roleLine = computed(() => {
-  if (userInfo.value?.college) return `${userInfo.value.college} · ${userInfo.value.grade}`
-  if (userStore.isGuest) return '待完善资料'
-  return '支协成员 · 项目负责人'
-})
+  if (userInfo.value?.college) return `${userInfo.value.college} · ${userInfo.value.grade || '成员'}`;
+  if (userStore.isGuest) return '待完善资料';
+  return userStore.isAdmin ? '支协管理员' : '支协成员';
+});
+
+const switchUser = async (userId: string) => {
+  try {
+    const user = await switchDevUser(userId);
+    userStore.setUser(user);
+    uni.showToast({ title: `已切换为${user.name}`, icon: 'none' });
+  } catch (error) {
+    uni.showToast({ title: '切换身份失败', icon: 'none' });
+  }
+};
+
+const resetData = async () => {
+  try {
+    await resetDevData();
+    const user = await login();
+    userStore.setUser(user);
+    uni.showToast({ title: '测试数据已重置', icon: 'none' });
+  } catch (error) {
+    uni.showToast({ title: '重置失败', icon: 'none' });
+  }
+};
 
 const goProfile = () => {
-  uni.navigateTo({ url: '/pages/mine/profile' })
-}
+  uni.navigateTo({ url: '/pages/mine/profile' });
+};
 
 const goReview = () => {
-  uni.navigateTo({ url: '/pages/admin/review' })
-}
+  uni.navigateTo({ url: '/pages/admin/review' });
+};
 
 const goAdmin = () => {
-  uni.navigateTo({ url: '/pages/admin/publish' })
-}
+  uni.navigateTo({ url: '/pages/admin/publish' });
+};
 </script>
 
 <style lang="scss" scoped>
@@ -177,7 +226,7 @@ const goAdmin = () => {
 }
 
 .role {
-  color: rgba(255, 255, 255, 0.74);
+  color: rgba(255, 255, 255, 0.78);
   font-size: 25rpx;
 }
 
@@ -185,7 +234,7 @@ const goAdmin = () => {
   @include soft-card;
   display: flex;
   padding: 28rpx 0;
-  margin-bottom: 34rpx;
+  margin-bottom: 28rpx;
 }
 
 .stat-item {
@@ -212,11 +261,67 @@ const goAdmin = () => {
   font-size: 23rpx;
 }
 
+.dev-panel {
+  @include soft-card;
+  padding: 24rpx;
+  margin-bottom: 30rpx;
+}
+
+.section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18rpx;
+}
+
 .section-title-small {
   margin: 10rpx 8rpx 18rpx;
   color: $text-primary;
   font-size: 30rpx;
   font-weight: 700;
+}
+
+.section-row .section-title-small {
+  margin: 0;
+}
+
+.dev-current {
+  color: $text-muted;
+  font-size: 22rpx;
+}
+
+.dev-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12rpx;
+}
+
+.dev-btn {
+  width: 100%;
+  height: 58rpx;
+  line-height: 58rpx;
+  margin: 0;
+  padding: 0;
+  border-radius: 14rpx;
+  border: 1rpx solid rgba(9, 86, 140, 0.16);
+  background: $paper-light;
+  color: $text-secondary;
+  font-size: 22rpx;
+}
+
+.dev-btn::after {
+  border: none;
+}
+
+.dev-btn.active {
+  color: #fff;
+  background: $ink-blue;
+}
+
+.dev-btn.danger {
+  color: $red;
+  background: $red-bg;
+  border-color: rgba(192, 57, 43, 0.16);
 }
 
 .project-mini-card {
@@ -286,6 +391,7 @@ const goAdmin = () => {
   border-radius: 8rpx;
   background: rgba(31, 78, 95, 0.12);
   position: relative;
+  flex: 0 0 auto;
 }
 
 .menu-icon.chart::after,
@@ -307,5 +413,11 @@ const goAdmin = () => {
 .arrow {
   color: $text-muted;
   font-size: 36rpx;
+}
+
+@media (max-width: 360px) {
+  .dev-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

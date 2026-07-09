@@ -1,5 +1,5 @@
-import { localDb } from '@/mock/localDb';
+import { request } from '@/utils/request';
 
 export const getMaterials = async (): Promise<any[]> => {
-  return localDb.listMaterials();
+  return request<any[]>('/materials');
 };

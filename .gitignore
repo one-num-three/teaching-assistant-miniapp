@@ -11,6 +11,7 @@ node_modules
 .DS_Store
 dist
 *.local
+mock-server/src/db.json
 
 # Editor directories and files
 .idea
