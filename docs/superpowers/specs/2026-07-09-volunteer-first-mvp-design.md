@@ -241,3 +241,204 @@ The UI is accepted when:
 - Each page has one obvious primary action.
 - Admin functions are discoverable but not dominant.
 - Role quantities are visible and understandable.
+
+## Technical Implementation Addendum
+
+### Local API First
+
+The first implementation phase should use a local API server for debugging, not page-level mock data and not CloudBase. This keeps the frontend close to the later production architecture.
+
+Target architecture:
+
+```txt
+uni-app pages
+-> src/api/*
+-> src/utils/request.ts
+-> local API server: http://127.0.0.1:3100/api
+-> local JSON or SQLite database
+```
+
+Later production architecture:
+
+```txt
+uni-app pages
+-> src/api/*
+-> src/utils/request.ts
+-> production API server: https://api.example.com
+-> production database
+```
+
+The page layer should not know whether data comes from local debug storage, local API server, or production server. Pages call `src/api/*` only.
+
+### Recommended Local Server Structure
+
+```txt
+mock-server/
+├── package.json
+├── src/server.ts
+├── src/db.json
+├── src/routes/projects.ts
+├── src/routes/materials.ts
+├── src/routes/users.ts
+├── src/services/projectService.ts
+└── src/services/materialService.ts
+```
+
+The local server should run on:
+
+```txt
+http://127.0.0.1:3100/api
+```
+
+Frontend configuration should be centralized:
+
+```txt
+src/config/env.ts
+src/utils/request.ts
+```
+
+Do not hard-code `localhost` or `127.0.0.1` inside pages.
+
+### Local Debugging Notes
+
+- In WeChat DevTools, enable "do not verify legal domain name" for local API requests.
+- In simulator mode, `127.0.0.1:3100` points to the development machine.
+- In real-device preview, `127.0.0.1` points to the phone itself, not the computer. Use the computer LAN IP, for example `http://192.168.1.8:3100/api`.
+- Production must use HTTPS and a configured WeChat Mini Program legal request domain.
+- H5 debugging may require CORS headers from the local server.
+- JSON-file storage must serialize writes to avoid corrupting data during concurrent requests.
+
+### API Contract
+
+The frontend should be built against these endpoints. Production should keep the same contract where possible.
+
+```txt
+GET    /api/me
+POST   /api/dev/switch-user
+POST   /api/dev/reset
+
+GET    /api/projects
+POST   /api/projects
+GET    /api/projects/:id
+POST   /api/projects/:id/claim-leader
+POST   /api/projects/:id/submit-lesson
+POST   /api/projects/:id/review
+POST   /api/projects/:id/claim-position
+
+GET    /api/materials
+GET    /api/admin/projects
+```
+
+Local debugging must support switching users:
+
+```txt
+x-dev-user-id: admin-1
+x-dev-user-id: volunteer-1
+x-dev-user-id: volunteer-2
+```
+
+This is required to test admin review, leader claim, and support role claim without real WeChat login.
+
+### State Machine Rules
+
+State transitions must live in the service layer, not inside pages.
+
+```txt
+pending_claim
+-> claim leader
+-> pending_review + not_submitted
+
+pending_review
+-> submit lesson
+-> pending_review + pending_review
+
+pending_review
+-> approve
+-> recruiting + approved
+-> auto create material
+
+pending_review
+-> reject
+-> revision_required + rejected
+
+revision_required
+-> resubmit lesson
+-> pending_review + pending_review
+
+recruiting
+-> claim support roles
+-> locked when all configured roles are full
+```
+
+The service layer must reject invalid transitions. The page layer should only display user-friendly errors.
+
+### Role Slot Edge Cases
+
+The server must enforce role constraints. Frontend hiding is not sufficient.
+
+Rules:
+
+- Leader/main lecturer is fixed to one person.
+- Support role quantities are configured when publishing a slot.
+- A role with `total = 0` cannot be claimed.
+- A full role cannot be claimed again.
+- One user can claim only one role in the same project in MVP.
+- The leader cannot also claim a support role in MVP.
+- `total = 0` roles are excluded from the full-project check.
+- The project becomes `locked` only when every configured role with `total > 0` is full.
+
+### Material Library Rules
+
+The material library MVP is automatic only.
+
+When a lesson plan is approved:
+
+- Create one material entry from the approved lesson plan.
+- Set `sourceProjectId`.
+- Set `sourceProjectTitle`.
+- Set file metadata from the submitted lesson plan.
+- Do not create duplicate materials if the same project is approved again.
+
+Suggested material fields:
+
+```ts
+{
+  id: string
+  title: string
+  category: string
+  fileName: string
+  fileType: string
+  sourceProjectId: string
+  sourceProjectTitle: string
+  createdAt: number
+  tags: string[]
+}
+```
+
+Manual upload, edit, delete, and featured management are deferred.
+
+### Implementation Order
+
+The implementation should follow this order:
+
+```txt
+1. Define API contract and shared types.
+2. Build local API server.
+3. Add src/utils/request.ts and frontend environment config.
+4. Switch src/api/* from direct local storage to request-based APIs.
+5. Add dev user switching and data reset.
+6. Rebuild the slot page around recent slots and volunteer actions.
+7. Rebuild project detail around current state and primary action.
+8. Connect leader claim, lesson submission, review, and support role claim.
+9. Connect automatic material library ingestion.
+10. Polish UI only after the full local flow works.
+```
+
+The implementation priority is:
+
+```txt
+API contract first
+local server second
+page integration third
+visual polish last
+```
