@@ -24,4 +24,5 @@ export const switchDevUser = async (userId: string): Promise<User> => {
 
 export const resetDevData = async (): Promise<void> => {
   await request('/dev/reset', { method: 'POST' });
+  setDevUserId('admin-1');
 };

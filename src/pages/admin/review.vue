@@ -8,70 +8,78 @@
     </view>
 
     <view class="content-layer safe-bottom">
-      <view class="pending-card">
-        <text class="pending-small">待审核 · {{ pendingProjects.length }} 份教案</text>
-        <text class="pending-title">{{ currentProject?.title || '暂无待审核教案' }}</text>
-        <text class="pending-meta">{{ pendingMeta }}</text>
+      <view v-if="permissionDenied" class="state-card permission-card">
+        <text class="state-title">暂无审核权限</text>
+        <text class="state-copy">请先在“我的”切换为管理员账号，再进入教案审核台。</text>
+        <view class="single-action" @click="goMine">去切换身份</view>
       </view>
 
-      <view v-if="loading" class="state-card">正在加载审核列表...</view>
-      <view v-else-if="!currentProject" class="state-card">所有教案都已处理</view>
-
       <block v-else>
-        <view class="review-card">
-          <view class="review-head">
-            <text class="card-title">教案详情</text>
-            <text class="pill amber">待审核</text>
-          </view>
+        <view class="pending-card">
+          <text class="pending-small">待审核 · {{ pendingProjects.length }} 份教案</text>
+          <text class="pending-title">{{ currentProject?.title || '暂无待审核教案' }}</text>
+          <text class="pending-meta">{{ pendingMeta }}</text>
+        </view>
 
-          <view class="info-block">
-            <text class="info-label">教案标题</text>
-            <text class="info-value">{{ currentProject.lesson_plan?.title }}</text>
-          </view>
+        <view v-if="loading" class="state-card">正在加载审核列表...</view>
+        <view v-else-if="!currentProject" class="state-card">所有教案都已处理</view>
 
-          <view class="info-block">
-            <text class="info-label">教案文件</text>
-            <view class="file-line">
-              <view class="pdf-icon">PDF</view>
-              <view>
-                <text class="file-name">{{ currentProject.lesson_plan?.file_name }}</text>
-                <text class="file-size">{{ currentProject.lesson_plan?.size }}</text>
+        <block v-else>
+          <view class="review-card">
+            <view class="review-head">
+              <text class="card-title">教案详情</text>
+              <text class="pill amber">待审核</text>
+            </view>
+
+            <view class="info-block">
+              <text class="info-label">教案标题</text>
+              <text class="info-value">{{ currentProject.lesson_plan?.title || currentProject.title }}</text>
+            </view>
+
+            <view class="info-block">
+              <text class="info-label">教案文件</text>
+              <view class="file-line">
+                <view class="pdf-icon">PDF</view>
+                <view>
+                  <text class="file-name">{{ currentProject.lesson_plan?.file_name || '本地测试教案.pdf' }}</text>
+                  <text class="file-size">{{ currentProject.lesson_plan?.size || '2.4 MB' }}</text>
+                </view>
               </view>
             </view>
-          </view>
 
-          <view class="info-block">
-            <text class="info-label">辅助岗位设置</text>
-            <view class="chips">
-              <text v-for="item in positionChips" :key="item" class="chip">{{ item }}</text>
+            <view class="info-block">
+              <text class="info-label">辅助岗位设置</text>
+              <view class="chips">
+                <text v-for="item in positionChips" :key="item" class="chip">{{ item }}</text>
+              </view>
+            </view>
+
+            <view class="info-block">
+              <text class="info-label">审核说明</text>
+              <text class="info-value">通过后项目进入招募中，并自动沉淀到资料库；驳回后保留负责人，返回需修改状态，可重新提交。</text>
+            </view>
+
+            <view class="action-row">
+              <view class="action-button approve" :class="{ disabled: submitting }" @click="approve">通过立项</view>
+              <view class="action-button reject" :class="{ disabled: submitting }" @click="reject">驳回修改</view>
             </view>
           </view>
+        </block>
 
-          <view class="info-block">
-            <text class="info-label">审核说明</text>
-            <text class="info-value">通过后项目进入招募中，并自动沉淀到资料库；驳回后保留负责人，返回需修改，可重新提交。</text>
-          </view>
+        <view class="note-card">
+          <text class="card-title">审核规则</text>
+          <text class="note-line">通过：教案状态变为已通过，项目进入招募中或已锁定。</text>
+          <text class="note-line">驳回：项目回到需修改，只允许负责人重新提交教案。</text>
+        </view>
 
-          <view class="action-row">
-            <button class="approve" :disabled="submitting" @click="approve">通过立项</button>
-            <button class="reject" :disabled="submitting" @click="reject">驳回修改</button>
+        <view class="note-card">
+          <text class="card-title">快捷操作</text>
+          <view class="quick-row">
+            <view class="quick primary" @click="goPublish">发布新档期</view>
+            <view class="quick ghost" @click="loadPending">刷新列表</view>
           </view>
         </view>
       </block>
-
-      <view class="note-card">
-        <text class="card-title">审核规则</text>
-        <text class="note-line">通过：教案状态变为已通过，项目进入招募中或已锁定。</text>
-        <text class="note-line">驳回：项目回到需修改，只允许负责人重新提交教案。</text>
-      </view>
-
-      <view class="note-card">
-        <text class="card-title">快捷操作</text>
-        <view class="quick-row">
-          <button class="quick primary" @click="goPublish">发布新档期</button>
-          <button class="quick ghost" @click="loadPending">刷新列表</button>
-        </view>
-      </view>
     </view>
   </view>
 </template>
@@ -80,10 +88,14 @@
 import { computed, onMounted, ref } from 'vue';
 import { getErrorMessage } from '@/constants/errors';
 import { getReviewProjects, reviewLesson } from '@/api/project';
+import { login } from '@/api/user';
+import { useUserStore } from '@/stores/user';
 
+const userStore = useUserStore();
 const pendingProjects = ref<any[]>([]);
 const loading = ref(false);
 const submitting = ref(false);
+const permissionDenied = ref(false);
 
 const currentProject = computed(() => pendingProjects.value[0] || null);
 const pendingMeta = computed(() => {
@@ -102,49 +114,77 @@ const positionChips = computed(() => {
   };
   return Object.entries(positions)
     .filter(([key]) => key !== 'lecturer')
+    .filter(([, raw]: any) => Number(raw?.total || 0) > 0)
     .map(([key, raw]: any) => `${names[key] || key} × ${raw.total || 0}`);
 });
 
+const ensureUser = async () => {
+  if (userStore.userInfo) return;
+  const user = await login();
+  userStore.setUser(user);
+};
+
 const goBack = () => uni.navigateBack();
 
+const goMine = () => {
+  uni.switchTab({ url: '/pages/mine/index' });
+};
+
 const goPublish = () => {
+  if (!userStore.isAdmin) {
+    permissionDenied.value = true;
+    return;
+  }
   uni.navigateTo({ url: '/pages/admin/publish' });
 };
 
 const loadPending = async () => {
+  if (submitting.value) return;
   loading.value = true;
+  permissionDenied.value = false;
   try {
+    await ensureUser();
+    if (!userStore.isAdmin) {
+      permissionDenied.value = true;
+      pendingProjects.value = [];
+      return;
+    }
     pendingProjects.value = await getReviewProjects();
   } catch (err: any) {
-    uni.showToast({ title: getErrorMessage(err?.code, err?.msg || '加载失败'), icon: 'none' });
+    if (err?.code === 'NO_PERMISSION' || /权限|permission/i.test(err?.message || '')) {
+      permissionDenied.value = true;
+      pendingProjects.value = [];
+      return;
+    }
+    uni.showToast({ title: getErrorMessage(err?.code, err?.message || '加载失败'), icon: 'none' });
   } finally {
     loading.value = false;
   }
 };
 
 const approve = async () => {
-  if (!currentProject.value) return;
+  if (!currentProject.value || submitting.value) return;
   submitting.value = true;
   try {
     await reviewLesson(currentProject.value._id, 'approve');
     uni.showToast({ title: '已通过', icon: 'success' });
     await loadPending();
   } catch (err: any) {
-    uni.showToast({ title: getErrorMessage(err?.code, err?.msg || '审核失败'), icon: 'none' });
+    uni.showToast({ title: getErrorMessage(err?.code, err?.message || '审核失败'), icon: 'none' });
   } finally {
     submitting.value = false;
   }
 };
 
 const reject = async () => {
-  if (!currentProject.value) return;
+  if (!currentProject.value || submitting.value) return;
   submitting.value = true;
   try {
     await reviewLesson(currentProject.value._id, 'reject', '请补充课堂流程和材料清单');
     uni.showToast({ title: '已驳回', icon: 'none' });
     await loadPending();
   } catch (err: any) {
-    uni.showToast({ title: getErrorMessage(err?.code, err?.msg || '审核失败'), icon: 'none' });
+    uni.showToast({ title: getErrorMessage(err?.code, err?.message || '审核失败'), icon: 'none' });
   } finally {
     submitting.value = false;
   }
@@ -161,6 +201,13 @@ onMounted(loadPending);
   @include ink-header(196rpx);
   padding: 64rpx 34rpx 40rpx;
   box-sizing: border-box;
+}
+
+.nav-back {
+  position: absolute;
+  left: 0;
+  font-size: 48rpx;
+  line-height: 1;
 }
 
 .pending-card {
@@ -189,7 +236,9 @@ onMounted(loadPending);
 
 .pending-small,
 .pending-title,
-.pending-meta {
+.pending-meta,
+.state-title,
+.state-copy {
   display: block;
 }
 
@@ -221,6 +270,35 @@ onMounted(loadPending);
 .state-card {
   color: $text-secondary;
   text-align: center;
+}
+
+.permission-card {
+  padding: 42rpx 30rpx;
+}
+
+.state-title {
+  color: $text-primary;
+  font-size: 32rpx;
+  font-weight: 800;
+}
+
+.state-copy {
+  margin-top: 14rpx;
+  color: $text-secondary;
+  font-size: 25rpx;
+  line-height: 1.6;
+}
+
+.single-action {
+  width: 260rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  margin: 28rpx auto 0;
+  border-radius: 16rpx;
+  background: $ink-blue;
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 700;
 }
 
 .review-head {
@@ -312,13 +390,19 @@ onMounted(loadPending);
   gap: 18rpx;
 }
 
-.approve,
-.reject {
+.action-button,
+.quick {
   flex: 1;
   height: 78rpx;
+  line-height: 78rpx;
   border-radius: 18rpx;
   font-size: 28rpx;
   font-weight: 800;
+  text-align: center;
+}
+
+.action-button.disabled {
+  opacity: 0.58;
 }
 
 .approve {
@@ -341,14 +425,6 @@ onMounted(loadPending);
   display: flex;
   gap: 18rpx;
   margin-top: 22rpx;
-}
-
-.quick {
-  flex: 1;
-  height: 76rpx;
-  border-radius: 16rpx;
-  font-size: 26rpx;
-  font-weight: 700;
 }
 
 .quick.primary {

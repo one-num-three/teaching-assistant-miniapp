@@ -33,37 +33,59 @@
       <view class="dev-panel">
         <view class="section-row">
           <text class="section-title-small">本地调试</text>
-          <text class="dev-current">{{ userInfo?.openid || '未选择' }}</text>
+          <text class="dev-current">{{ debugState?.currentUserId || activeUserId || '未选择' }}</text>
         </view>
+
         <view class="dev-actions">
-          <button
+          <view
             v-for="item in devUsers"
             :key="item.id"
             class="dev-btn"
             :class="{ active: activeUserId === item.id }"
-            size="mini"
             @click="switchUser(item.id)"
           >
             {{ item.label }}
-          </button>
-          <button class="dev-btn danger" size="mini" @click="resetData">重置数据</button>
+          </view>
+          <view class="dev-btn ghost" @click="refreshPage">刷新</view>
+          <view class="dev-btn danger" @click="resetData">重置数据</view>
+        </view>
+
+        <view v-if="debugState" class="debug-grid">
+          <view class="debug-cell">
+            <text class="debug-num">{{ debugState.counts.projects }}</text>
+            <text class="debug-label">项目</text>
+          </view>
+          <view class="debug-cell">
+            <text class="debug-num">{{ debugState.counts.materials }}</text>
+            <text class="debug-label">资料</text>
+          </view>
+          <view class="debug-cell">
+            <text class="debug-num">{{ debugState.counts.claims }}</text>
+            <text class="debug-label">认领</text>
+          </view>
+          <view class="debug-cell">
+            <text class="debug-num">{{ debugState.counts.reviews }}</text>
+            <text class="debug-label">审核</text>
+          </view>
+        </view>
+
+        <view v-if="recentLogs.length" class="log-list">
+          <view v-for="item in recentLogs" :key="item._id" class="log-item">
+            <text class="log-title">{{ item.title }}</text>
+            <text class="log-copy">{{ item.subtitle }}</text>
+          </view>
         </view>
       </view>
 
-      <view class="section-title-small">我的项目</view>
-      <view class="project-mini-card">
+      <view class="section-title-small with-space">我的项目</view>
+      <view v-if="loadingProjects" class="empty-card">正在加载项目...</view>
+      <view v-else-if="!myProjects.length" class="empty-card">当前身份暂无参与项目</view>
+      <view v-for="project in myProjects" :key="project._id" class="project-mini-card" @click="goProject(project._id)">
         <view>
-          <text class="mini-title">古诗诵读与飞花令</text>
-          <text class="mini-meta">主讲 · 7月7日</text>
+          <text class="mini-title">{{ project.title }}</text>
+          <text class="mini-meta">{{ getMyRole(project) }} · {{ project.date }} {{ project.start_time }}</text>
         </view>
-        <text class="pill green">已完成</text>
-      </view>
-      <view class="project-mini-card">
-        <view>
-          <text class="mini-title">趣味科普：地球的呼吸</text>
-          <text class="mini-meta">项目负责人 · 7月5日</text>
-        </view>
-        <text class="pill green">招募中</text>
+        <text class="pill" :class="statusTone(project.project_status)">{{ statusText(project.project_status) }}</text>
       </view>
 
       <view class="menu-group">
@@ -110,7 +132,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { onShow } from '@dcloudio/uni-app';
+import { getDevState, type DevState } from '@/api/debug';
+import { getProjects } from '@/api/project';
 import { login, resetDevData, switchDevUser } from '@/api/user';
 import { useUserStore } from '@/stores/user';
 
@@ -119,6 +144,9 @@ const userInfo = computed(() => userStore.userInfo);
 const defaultAvatar = '/static/logo.png';
 const showAdminEntry = computed(() => userStore.isAdmin);
 const activeUserId = computed(() => userInfo.value?.openid || '');
+const projects = ref<any[]>([]);
+const debugState = ref<DevState | null>(null);
+const loadingProjects = ref(false);
 
 const devUsers = [
   { id: 'admin-1', label: '管理员' },
@@ -126,16 +154,53 @@ const devUsers = [
   { id: 'volunteer-2', label: '志愿者B' }
 ];
 
+const recentLogs = computed(() => {
+  if (!debugState.value) return [];
+  return [
+    ...debugState.value.recentClaims,
+    ...debugState.value.recentReviews,
+    ...debugState.value.recentNotifications
+  ]
+    .sort((a, b) => b.created_at - a.created_at)
+    .slice(0, 3);
+});
+
 const roleLine = computed(() => {
   if (userInfo.value?.college) return `${userInfo.value.college} · ${userInfo.value.grade || '成员'}`;
   if (userStore.isGuest) return '待完善资料';
   return userStore.isAdmin ? '支协管理员' : '支协成员';
 });
 
+const myProjects = computed(() => {
+  const openid = activeUserId.value;
+  if (!openid) return [];
+  return projects.value.filter((project) => {
+    if (project.leader?.user_id === openid) return true;
+    return Object.values(project.positions || {}).some((position: any) =>
+      (position.members || []).some((member: any) => member.user_id === openid)
+    );
+  });
+});
+
+async function refreshPage() {
+  loadingProjects.value = true;
+  try {
+    const [user, projectList, state] = await Promise.all([login(), getProjects(), getDevState()]);
+    userStore.setUser(user);
+    projects.value = projectList;
+    debugState.value = state;
+  } catch (error) {
+    uni.showToast({ title: '本地数据加载失败', icon: 'none' });
+  } finally {
+    loadingProjects.value = false;
+  }
+}
+
 const switchUser = async (userId: string) => {
   try {
     const user = await switchDevUser(userId);
     userStore.setUser(user);
+    await refreshPage();
     uni.showToast({ title: `已切换为${user.name}`, icon: 'none' });
   } catch (error) {
     uni.showToast({ title: '切换身份失败', icon: 'none' });
@@ -145,12 +210,49 @@ const switchUser = async (userId: string) => {
 const resetData = async () => {
   try {
     await resetDevData();
-    const user = await login();
-    userStore.setUser(user);
+    await refreshPage();
     uni.showToast({ title: '测试数据已重置', icon: 'none' });
   } catch (error) {
     uni.showToast({ title: '重置失败', icon: 'none' });
   }
+};
+
+const getMyRole = (project: any) => {
+  const openid = activeUserId.value;
+  if (project.leader?.user_id === openid) return '项目负责人';
+  const names: Record<string, string> = {
+    lecturer: '主讲',
+    assistant: '助教',
+    ppt: 'PPT',
+    photographer: '摄影',
+    logistics: '场务'
+  };
+  for (const [key, position] of Object.entries(project.positions || {})) {
+    if ((position as any).members?.some((member: any) => member.user_id === openid)) return names[key] || key;
+  }
+  return '成员';
+};
+
+const statusText = (status: string) => {
+  const map: Record<string, string> = {
+    pending_claim: '待认领',
+    pending_review: '待审核',
+    revision_required: '需修改',
+    recruiting: '招募中',
+    locked: '已锁定',
+    completed: '已完成'
+  };
+  return map[status] || status;
+};
+
+const statusTone = (status: string) => {
+  if (status === 'recruiting' || status === 'completed' || status === 'locked') return 'green';
+  if (status === 'pending_claim' || status === 'pending_review' || status === 'revision_required') return 'amber';
+  return 'blue';
+};
+
+const goProject = (projectId: string) => {
+  uni.navigateTo({ url: `/pages/project/detail?id=${projectId}` });
 };
 
 const goProfile = () => {
@@ -164,6 +266,8 @@ const goReview = () => {
 const goAdmin = () => {
   uni.navigateTo({ url: '/pages/admin/publish' });
 };
+
+onShow(refreshPage);
 </script>
 
 <style lang="scss" scoped>
@@ -275,14 +379,13 @@ const goAdmin = () => {
 }
 
 .section-title-small {
-  margin: 10rpx 8rpx 18rpx;
   color: $text-primary;
   font-size: 30rpx;
   font-weight: 700;
 }
 
-.section-row .section-title-small {
-  margin: 0;
+.with-space {
+  margin: 10rpx 8rpx 18rpx;
 }
 
 .dev-current {
@@ -292,30 +395,31 @@ const goAdmin = () => {
 
 .dev-actions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12rpx;
 }
 
 .dev-btn {
-  width: 100%;
-  height: 58rpx;
-  line-height: 58rpx;
-  margin: 0;
-  padding: 0;
+  min-height: 58rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8rpx;
   border-radius: 14rpx;
   border: 1rpx solid rgba(9, 86, 140, 0.16);
   background: $paper-light;
   color: $text-secondary;
   font-size: 22rpx;
-}
-
-.dev-btn::after {
-  border: none;
+  text-align: center;
 }
 
 .dev-btn.active {
   color: #fff;
   background: $ink-blue;
+}
+
+.dev-btn.ghost {
+  color: $ink-blue;
 }
 
 .dev-btn.danger {
@@ -324,14 +428,80 @@ const goAdmin = () => {
   border-color: rgba(192, 57, 43, 0.16);
 }
 
+.debug-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12rpx;
+  margin-top: 18rpx;
+}
+
+.debug-cell {
+  padding: 16rpx 8rpx;
+  border-radius: 14rpx;
+  background: rgba(31, 78, 95, 0.06);
+  text-align: center;
+}
+
+.debug-num,
+.debug-label,
+.log-title,
+.log-copy {
+  display: block;
+}
+
+.debug-num {
+  color: $ink-blue;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.debug-label {
+  margin-top: 4rpx;
+  color: $text-muted;
+  font-size: 21rpx;
+}
+
+.log-list {
+  margin-top: 18rpx;
+}
+
+.log-item {
+  padding: 14rpx 0;
+  border-top: 1rpx solid rgba(31, 78, 95, 0.07);
+}
+
+.log-title {
+  color: $text-primary;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.log-copy {
+  margin-top: 4rpx;
+  color: $text-secondary;
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+
+.empty-card,
 .project-mini-card {
   @include soft-card;
   min-height: 88rpx;
+  padding: 24rpx 28rpx;
+  margin-bottom: 18rpx;
+}
+
+.empty-card {
+  color: $text-secondary;
+  font-size: 26rpx;
+  text-align: center;
+}
+
+.project-mini-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24rpx 28rpx;
-  margin-bottom: 18rpx;
+  gap: 18rpx;
   position: relative;
   overflow: hidden;
 }
@@ -417,6 +587,10 @@ const goAdmin = () => {
 
 @media (max-width: 360px) {
   .dev-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .debug-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

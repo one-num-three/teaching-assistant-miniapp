@@ -52,6 +52,32 @@ function getUser(db, userId) {
   return db.users.find((user) => user.id === userId || user.openid === userId) || db.users[0];
 }
 
+function compactLog(item, titleFallback, subtitleFallback) {
+  return {
+    _id: item._id,
+    title: item.title || item.project_title || titleFallback,
+    subtitle: item.content || item.comment || item.user_name || subtitleFallback,
+    created_at: item.created_at || 0
+  };
+}
+
+function buildDevState(db) {
+  return {
+    currentUserId: db.currentUserId || 'admin-1',
+    counts: {
+      users: db.users.length,
+      projects: db.projects.length,
+      materials: db.materials.length,
+      claims: db.project_claims.length,
+      reviews: db.lesson_reviews.length,
+      notifications: db.notifications.length
+    },
+    recentClaims: db.project_claims.slice(0, 5).map((item) => compactLog(item, '认领记录', item.position_key || '')),
+    recentReviews: db.lesson_reviews.slice(0, 5).map((item) => compactLog(item, '审核记录', item.action || '')),
+    recentNotifications: db.notifications.slice(0, 5).map((item) => compactLog(item, '通知记录', item.user_id || ''))
+  };
+}
+
 async function route(req, res) {
   if (req.method === 'OPTIONS') return send(res, 204, {});
 
@@ -73,8 +99,13 @@ async function route(req, res) {
     return ok(res, await userService.updateUserProfile(userId, await readBody(req)));
   }
 
+  if (method === 'GET' && pathname === '/api/dev/state') {
+    return ok(res, buildDevState(readDb()));
+  }
+
   if (method === 'POST' && pathname === '/api/dev/reset') {
-    return ok(res, await resetDb());
+    await resetDb();
+    return ok(res, buildDevState(readDb()));
   }
 
   if (method === 'POST' && pathname === '/api/dev/switch-user') {

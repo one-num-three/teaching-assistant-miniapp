@@ -21,6 +21,53 @@ async function testUserProfileUpdate() {
   assert.strictEqual(storedUser.name, '测试志愿者');
 }
 
+async function assertRejectsWithCode(fn, code) {
+  let caught = null;
+  try {
+    await fn();
+  } catch (error) {
+    caught = error;
+  }
+  assert(caught, `Expected ${code} error`);
+  assert.strictEqual(caught.code, code);
+}
+
+async function testPublishPermissionAndProjectVisible() {
+  await resetDb();
+
+  await assertRejectsWithCode(
+    () =>
+      projectService.publishProject('volunteer-1', {
+        title: 'member publish should fail',
+        date: '2026-07-18',
+        start_time: '14:00',
+        end_time: '15:30',
+        location: 'local test community',
+        target_audience: 'primary students',
+        positions: { assistant: 1 }
+      }),
+    'NO_PERMISSION'
+  );
+
+  const createdProject = await projectService.publishProject('admin-1', {
+    title: 'admin publish smoke test',
+    date: '2026-07-18',
+    start_time: '14:00',
+    end_time: '15:30',
+    location: 'local test community',
+    target_audience: 'primary students',
+    positions: { assistant: 2, ppt: 1, photographer: 0, logistics: 0 },
+    outline: ['intro', 'activity', 'wrap up']
+  });
+
+  assert.strictEqual(createdProject.project_status, 'pending_claim');
+  assert.strictEqual(createdProject.positions.assistant.total, 2);
+  assert.strictEqual(createdProject.positions.ppt.total, 1);
+
+  const projects = await projectService.listProjects();
+  assert(projects.some((item) => item._id === createdProject._id));
+}
+
 async function testProjectApprovalCreatesMaterialOnce() {
   await resetDb();
 
@@ -72,8 +119,10 @@ async function testSupportPositionCapacity() {
 
 async function main() {
   await testUserProfileUpdate();
+  await testPublishPermissionAndProjectVisible();
   await testProjectApprovalCreatesMaterialOnce();
   await testSupportPositionCapacity();
+  await resetDb();
   console.log('mock api tests passed');
 }
 

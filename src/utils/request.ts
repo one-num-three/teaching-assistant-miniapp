@@ -28,10 +28,15 @@ export function request<T>(path: string, options: RequestOptions = {}): Promise<
           return;
         }
 
-        reject(new Error(body.msg || `请求失败：${res.statusCode}`));
+        const error = new Error(body.msg || `请求失败：${res.statusCode}`);
+        (error as any).code = body.code;
+        (error as any).statusCode = res.statusCode;
+        reject(error);
       },
       fail: (err) => {
-        reject(new Error(err.errMsg || '网络请求失败'));
+        const error = new Error(err.errMsg || '网络请求失败');
+        (error as any).code = 'NETWORK_ERROR';
+        reject(error);
       }
     });
   });

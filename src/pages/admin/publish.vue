@@ -8,67 +8,84 @@
     </view>
 
     <view class="content-layer safe-bottom">
-      <view class="form-card">
-        <uni-forms ref="formRef" :modelValue="formData" :rules="rules">
-          <uni-forms-item label="课程主题" name="title" required>
-            <uni-easyinput v-model="formData.title" placeholder="例如：趣味科普：地球的呼吸" />
-          </uni-forms-item>
-
-          <uni-forms-item label="授课日期" name="date" required>
-            <uni-datetime-picker v-model="formData.date" type="date" />
-          </uni-forms-item>
-
-          <uni-forms-item label="开始时间" name="start_time" required>
-            <uni-datetime-picker v-model="formData.start_time" type="time" />
-          </uni-forms-item>
-
-          <uni-forms-item label="结束时间" name="end_time" required>
-            <uni-datetime-picker v-model="formData.end_time" type="time" />
-          </uni-forms-item>
-
-          <uni-forms-item label="授课地点" name="location" required>
-            <uni-easyinput v-model="formData.location" placeholder="例如：江宁区东山社区活动中心" />
-          </uni-forms-item>
-
-          <uni-forms-item label="受众" name="target_audience" required>
-            <uni-easyinput v-model="formData.target_audience" placeholder="例如：小学生 3-6 年级，约 25 人" />
-          </uni-forms-item>
-
-          <uni-forms-item label="教案大纲">
-            <uni-easyinput
-              v-model="formData.outlineText"
-              type="textarea"
-              placeholder="每行一个环节，例如：课程导入、实验演示、互动问答"
-            />
-          </uni-forms-item>
-        </uni-forms>
+      <view v-if="permissionDenied" class="state-card permission-card">
+        <text class="state-title">暂无发布权限</text>
+        <text class="state-copy">只有管理员可以发布支教档期。请先在“我的”切换到管理员账号。</text>
+        <view class="single-action" @click="goMine">去切换身份</view>
       </view>
 
-      <view class="form-card">
-        <view class="section-title-small">岗位配置</view>
-        <view class="position-row" v-for="item in positionItems" :key="item.key">
-          <view>
-            <text class="position-name">{{ item.label }}</text>
-            <text class="position-desc">{{ item.desc }}</text>
+      <block v-else>
+        <view class="form-card">
+          <view class="section-line">
+            <text class="section-title-small">档期信息</text>
+            <text class="sample-link" @click="fillSample">填充示例</text>
           </view>
-          <uni-number-box v-model="formData.positions[item.key]" :min="item.min" :max="6" />
-        </view>
-      </view>
 
-      <button class="primary-btn" :loading="submitting" :disabled="submitting" @click="submit">
-        发布档期
-      </button>
+          <uni-forms ref="formRef" :modelValue="formData" :rules="rules">
+            <uni-forms-item label="课程主题" name="title" required>
+              <uni-easyinput v-model="formData.title" placeholder="例如：趣味科普：地球的呼吸" />
+            </uni-forms-item>
+
+            <uni-forms-item label="授课日期" name="date" required>
+              <uni-datetime-picker v-model="formData.date" type="date" />
+            </uni-forms-item>
+
+            <uni-forms-item label="开始时间" name="start_time" required>
+              <uni-datetime-picker v-model="formData.start_time" type="time" />
+            </uni-forms-item>
+
+            <uni-forms-item label="结束时间" name="end_time" required>
+              <uni-datetime-picker v-model="formData.end_time" type="time" />
+            </uni-forms-item>
+
+            <uni-forms-item label="授课地点" name="location" required>
+              <uni-easyinput v-model="formData.location" placeholder="例如：江宁区东山社区活动中心" />
+            </uni-forms-item>
+
+            <uni-forms-item label="受众" name="target_audience" required>
+              <uni-easyinput v-model="formData.target_audience" placeholder="例如：小学生 3-6 年级，约 25 人" />
+            </uni-forms-item>
+
+            <uni-forms-item label="教案大纲">
+              <uni-easyinput
+                v-model="formData.outlineText"
+                type="textarea"
+                placeholder="每行一个环节，例如：课程导入、实验演示、互动问答"
+              />
+            </uni-forms-item>
+          </uni-forms>
+        </view>
+
+        <view class="form-card">
+          <view class="section-title-small">岗位配置</view>
+          <view class="position-row" v-for="item in positionItems" :key="item.key">
+            <view>
+              <text class="position-name">{{ item.label }}</text>
+              <text class="position-desc">{{ item.desc }}</text>
+            </view>
+            <uni-number-box v-model="formData.positions[item.key]" :min="item.min" :max="6" />
+          </view>
+        </view>
+
+        <view class="primary-btn" :class="{ disabled: submitting }" @click="submit">
+          {{ submitting ? '发布中...' : '发布档期' }}
+        </view>
+      </block>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { onMounted, reactive, ref } from 'vue';
 import { publishProject } from '@/api/project';
+import { login } from '@/api/user';
 import { getErrorMessage } from '@/constants/errors';
+import { useUserStore } from '@/stores/user';
 
+const userStore = useUserStore();
 const formRef = ref();
 const submitting = ref(false);
+const permissionDenied = ref(false);
 
 const formData = reactive({
   title: '',
@@ -102,13 +119,40 @@ const rules = {
   target_audience: { rules: [{ required: true, errorMessage: '请输入受众信息' }] }
 };
 
+async function ensurePermission() {
+  if (!userStore.userInfo) {
+    const user = await login();
+    userStore.setUser(user);
+  }
+  permissionDenied.value = !userStore.isAdmin;
+}
+
 function goBack() {
   uni.navigateBack();
 }
 
+function goMine() {
+  uni.switchTab({ url: '/pages/mine/index' });
+}
+
+function fillSample() {
+  formData.title = `本地测试档期 ${new Date().toLocaleTimeString()}`;
+  formData.date = '2026-07-18';
+  formData.start_time = '14:00';
+  formData.end_time = '15:30';
+  formData.location = '江宁区东山社区活动中心';
+  formData.target_audience = '小学生 3-6 年级，约 25 人';
+  formData.outlineText = ['课程导入', '主题讲解', '互动实验', '总结反馈'].join('\n');
+  formData.positions.assistant = 2;
+  formData.positions.ppt = 1;
+  formData.positions.photographer = 1;
+  formData.positions.logistics = 0;
+}
+
 async function submit() {
+  if (submitting.value || permissionDenied.value) return;
   try {
-    await formRef.value.validate();
+    await formRef.value?.validate();
     submitting.value = true;
 
     await publishProject({
@@ -127,15 +171,21 @@ async function submit() {
 
     uni.showToast({ title: '发布成功', icon: 'success' });
     setTimeout(() => {
-      uni.navigateBack();
-    }, 800);
+      uni.switchTab({ url: '/pages/index/index' });
+    }, 600);
   } catch (err: any) {
     const code = err?.code || err?.errCode;
-    uni.showToast({ title: getErrorMessage(code, err?.msg || '发布失败'), icon: 'none' });
+    uni.showToast({ title: getErrorMessage(code, err?.message || '发布失败'), icon: 'none' });
   } finally {
     submitting.value = false;
   }
 }
+
+onMounted(() => {
+  ensurePermission().catch(() => {
+    permissionDenied.value = true;
+  });
+});
 </script>
 
 <style lang="scss" scoped>
@@ -155,16 +205,64 @@ async function submit() {
   line-height: 1;
 }
 
+.state-card,
 .form-card {
   @include soft-card;
   padding: 28rpx;
   margin-bottom: 24rpx;
 }
 
+.permission-card {
+  padding: 42rpx 30rpx;
+  text-align: center;
+}
+
+.state-title,
+.state-copy {
+  display: block;
+}
+
+.state-title {
+  color: $text-primary;
+  font-size: 32rpx;
+  font-weight: 800;
+}
+
+.state-copy {
+  margin-top: 14rpx;
+  color: $text-secondary;
+  font-size: 25rpx;
+  line-height: 1.6;
+}
+
+.single-action {
+  width: 260rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  margin: 28rpx auto 0;
+  border-radius: 16rpx;
+  background: $ink-blue;
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.section-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14rpx;
+}
+
 .section-title-small {
-  margin-bottom: 12rpx;
   color: $text-primary;
   font-size: 30rpx;
+  font-weight: 700;
+}
+
+.sample-link {
+  color: $green;
+  font-size: 25rpx;
   font-weight: 700;
 }
 
@@ -206,5 +304,10 @@ async function submit() {
   color: #fff;
   font-size: 30rpx;
   font-weight: 700;
+  text-align: center;
+}
+
+.primary-btn.disabled {
+  opacity: 0.58;
 }
 </style>
