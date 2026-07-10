@@ -1,11 +1,15 @@
 <template>
   <view class="project-card" :class="cardTone" @click="goToDetail">
     <view class="card-top">
-      <view class="title-wrap">
-        <text class="project-title">{{ project.title }}</text>
-        <text class="project-meta">{{ project.location || project.school_name }} · {{ timeText }}</text>
-      </view>
+      <text class="project-kicker">{{ project.target_audience || '支教档期' }}</text>
       <text class="pill" :class="statusClass">{{ statusText }}</text>
+    </view>
+
+    <text class="project-title">{{ project.title }}</text>
+
+    <view class="project-meta">
+      <text class="meta-item location">{{ project.location || project.school_name }}</text>
+      <text class="meta-item time">{{ timeText }}</text>
     </view>
 
     <view class="role-row" v-if="project.positions">
@@ -19,6 +23,11 @@
       >
         {{ item.name }} {{ item.open > 0 ? `${item.open}人` : '已满' }}
       </text>
+    </view>
+
+    <view class="card-foot">
+      <text>{{ memberProgress }}</text>
+      <text class="detail-link">查看详情 <text class="chevron">›</text></text>
     </view>
   </view>
 </template>
@@ -74,6 +83,13 @@ const positionSummary = computed(() => {
     });
 });
 
+const memberProgress = computed(() => {
+  const positions = Object.values(props.project.positions || {}) as any[];
+  const total = positions.reduce((sum, item) => sum + Number(item.total || 0), 0);
+  const joined = positions.reduce((sum, item) => sum + Number(item.members?.length || 0), 0);
+  return total ? `${joined}/${total} 人已确认` : '岗位待配置';
+});
+
 const goToDetail = () => {
   uni.navigateTo({
     url: `/pages/project/detail?id=${props.project._id}`
@@ -88,10 +104,10 @@ const goToDetail = () => {
 .project-card {
   @include soft-card;
   position: relative;
-  padding: 26rpx 28rpx;
-  margin-bottom: 22rpx;
+  padding: 26rpx 26rpx 22rpx;
+  margin-bottom: 18rpx;
   overflow: hidden;
-  border-left: 6rpx solid rgba(95, 156, 121, 0.58);
+  border-left: 5rpx solid rgba(79, 132, 108, 0.7);
 }
 
 .project-card.waiting {
@@ -109,7 +125,7 @@ const goToDetail = () => {
   bottom: -38rpx;
   width: 260rpx;
   height: 150rpx;
-  opacity: 0.14;
+  opacity: 0.1;
   background: url('/static/card-ink-corner.png') right bottom / contain no-repeat;
 }
 
@@ -117,29 +133,59 @@ const goToDetail = () => {
   position: relative;
   z-index: 1;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 18rpx;
 }
 
-.title-wrap {
-  min-width: 0;
-  flex: 1;
+.project-kicker {
+  color: $text-muted;
+  font-size: 21rpx;
+  line-height: 1.3;
 }
 
 .project-title {
   display: block;
+  position: relative;
+  z-index: 1;
+  margin-top: 15rpx;
   color: $text-primary;
-  font-size: 30rpx;
+  font-family: $font-family-display;
+  font-size: 31rpx;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.42;
 }
 
 .project-meta {
-  display: block;
-  margin-top: 10rpx;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx 22rpx;
+  margin-top: 12rpx;
   color: $text-secondary;
-  font-size: 24rpx;
+  font-size: 23rpx;
+}
+
+.meta-item {
+  position: relative;
+  padding-left: 18rpx;
+}
+
+.meta-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 7rpx;
+  height: 7rpx;
+  border-radius: 50%;
+  background: $mist-blue;
+  transform: translateY(-50%);
+}
+
+.meta-item.time::before {
+  background: $amber;
 }
 
 .role-row {
@@ -147,16 +193,16 @@ const goToDetail = () => {
   z-index: 1;
   display: flex;
   flex-wrap: wrap;
-  gap: 12rpx;
-  margin-top: 20rpx;
+  gap: 10rpx;
+  margin-top: 18rpx;
 }
 
 .role-tag {
-  padding: 8rpx 16rpx;
-  border-radius: 10rpx;
+  padding: 7rpx 13rpx;
+  border-radius: 6rpx;
   color: $text-secondary;
   background: rgba(31, 78, 95, 0.06);
-  font-size: 23rpx;
+  font-size: 21rpx;
   line-height: 1;
 }
 
@@ -168,5 +214,29 @@ const goToDetail = () => {
 .role-tag.open {
   color: $amber;
   background: $amber-bg;
+}
+
+.card-foot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20rpx;
+  padding-top: 18rpx;
+  border-top: 1rpx solid rgba(69, 89, 88, 0.09);
+  color: $text-muted;
+  font-size: 21rpx;
+}
+
+.detail-link {
+  color: $ink-blue;
+  font-weight: 650;
+}
+
+.chevron {
+  margin-left: 4rpx;
+  font-size: 28rpx;
+  line-height: 1;
 }
 </style>

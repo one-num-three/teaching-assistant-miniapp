@@ -125,19 +125,19 @@ onShow(() => {
 @import '@/styles/mixins.scss';
 
 .materials-hero {
-  @include ink-header(216rpx);
-  padding: 64rpx 34rpx 46rpx;
+  @include ink-header(220rpx);
+  padding: 64rpx 34rpx 44rpx;
   box-sizing: border-box;
 }
 
 .search-box {
   @include soft-card;
-  height: 82rpx;
+  height: 78rpx;
   display: flex;
   align-items: center;
   gap: 18rpx;
-  padding: 0 30rpx;
-  border-radius: 999rpx;
+  padding: 0 24rpx;
+  border-radius: $radius-md;
   color: $text-muted;
   font-size: 27rpx;
 }
@@ -171,14 +171,15 @@ onShow(() => {
 
 .category-tabs {
   display: flex;
-  gap: 44rpx;
-  padding: 34rpx 18rpx 22rpx;
+  gap: 36rpx;
+  padding: 30rpx 4rpx 20rpx;
+  border-bottom: 1rpx solid rgba(69, 89, 88, 0.09);
 }
 
 .tab-item {
   position: relative;
   color: $text-secondary;
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 600;
   padding-bottom: 12rpx;
 }
@@ -202,18 +203,18 @@ onShow(() => {
   @include soft-card;
   display: flex;
   align-items: center;
-  gap: 26rpx;
-  padding: 28rpx;
-  margin-bottom: 22rpx;
+  gap: 22rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
 }
 
 .file-icon {
-  width: 86rpx;
-  height: 86rpx;
+  width: 78rpx;
+  height: 82rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12rpx;
+  border-radius: 8rpx;
   color: #fff;
   font-size: 24rpx;
   font-weight: 700;
@@ -233,7 +234,7 @@ onShow(() => {
 .favorite-action {
   flex: 0 0 auto;
   padding: 10rpx 14rpx;
-  border-radius: 999rpx;
+  border-radius: 6rpx;
   background: rgba(31, 78, 95, 0.08);
   color: $text-secondary;
   font-size: 21rpx;
@@ -247,7 +248,8 @@ onShow(() => {
 .material-title {
   display: block;
   color: $text-primary;
-  font-size: 31rpx;
+  font-family: $font-family-display;
+  font-size: 29rpx;
   font-weight: 700;
   @include text-ellipsis;
 }

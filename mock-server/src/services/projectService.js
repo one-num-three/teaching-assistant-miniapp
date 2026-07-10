@@ -451,11 +451,6 @@ async function reviewProjectCompletion(userId, projectId, payload) {
         confirmed_at: project.completion.confirmed_at,
         confirmed_by: user.openid
       });
-      const participantUser = db.users.find((item) => item.openid === participant.user_id);
-      if (participantUser) {
-        participantUser.stats = participantUser.stats || {};
-        participantUser.stats.volunteer_hours = Number(participantUser.stats.volunteer_hours || 0) + participant.hours;
-      }
     });
   }
 

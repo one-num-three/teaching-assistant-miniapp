@@ -277,8 +277,8 @@ onShow(() => {
 @import '@/styles/mixins.scss';
 
 .calendar-hero {
-  @include ink-header(250rpx);
-  padding: 64rpx 34rpx 54rpx;
+  @include ink-header(232rpx);
+  padding: 64rpx 34rpx 48rpx;
   box-sizing: border-box;
 }
 
@@ -288,9 +288,10 @@ onShow(() => {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.985) 100%),
     url('/static/ink-mountain-fade.png') center top / 100% auto no-repeat;
-  border-radius: 0 0 28rpx 28rpx;
-  box-shadow: 0 18rpx 48rpx rgba(31, 78, 95, 0.08);
-  padding: 22rpx 22rpx 30rpx;
+  border: 1rpx solid rgba(69, 89, 88, 0.1);
+  border-radius: $radius-md;
+  box-shadow: $shadow-card;
+  padding: 20rpx 18rpx 24rpx;
   color: $text-primary;
 }
 
@@ -309,23 +310,26 @@ onShow(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10rpx 0 28rpx;
+  padding: 8rpx 2rpx 22rpx;
 }
 
 .month-title {
   position: relative;
   z-index: 1;
   color: $text-primary;
-  font-size: 34rpx;
+  font-family: $font-family-display;
+  font-size: 33rpx;
   font-weight: 700;
 }
 
 .arrow {
   position: relative;
   z-index: 1;
-  width: 64rpx;
-  color: rgba(31, 78, 95, 0.34);
-  font-size: 48rpx;
+  width: 60rpx;
+  height: 60rpx;
+  color: $ink-blue-soft;
+  font-size: 42rpx;
+  line-height: 60rpx;
   text-align: center;
 }
 
@@ -347,10 +351,10 @@ onShow(() => {
 .date-cell {
   position: relative;
   z-index: 1;
-  height: 70rpx;
+  height: 68rpx;
   color: $text-primary;
   font-size: 27rpx;
-  line-height: 70rpx;
+  line-height: 68rpx;
 }
 
 .date-cell::before {
@@ -365,7 +369,7 @@ onShow(() => {
 }
 
 .date-cell.selected-week::before {
-  background: rgba(31, 78, 95, 0.08);
+  background: rgba(79, 132, 108, 0.1);
 }
 
 .date-cell.week-start::before {
@@ -395,8 +399,8 @@ onShow(() => {
   justify-content: center;
   color: #fff;
   border-radius: 50%;
-  background: $ink-blue-deep;
-  box-shadow: 0 8rpx 18rpx rgba(9, 86, 140, 0.18);
+  background: $ink-blue;
+  box-shadow: 0 8rpx 18rpx rgba(23, 55, 67, 0.18);
 }
 
 .day-count {
@@ -421,7 +425,9 @@ onShow(() => {
 }
 
 .selection-summary {
-  margin: 28rpx 8rpx 18rpx;
+  margin: 32rpx 2rpx 18rpx;
+  padding-left: 18rpx;
+  border-left: 5rpx solid $green;
 }
 
 .summary-title,
@@ -431,8 +437,9 @@ onShow(() => {
 
 .summary-title {
   color: $text-primary;
-  font-size: 32rpx;
-  font-weight: 800;
+  font-family: $font-family-display;
+  font-size: 31rpx;
+  font-weight: 700;
 }
 
 .summary-subtitle {

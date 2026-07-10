@@ -2,8 +2,9 @@
 
 .uni-button,
 button {
-  border-radius: 18rpx;
-  font-weight: 600;
+  min-height: 80rpx;
+  border-radius: 12rpx;
+  font-weight: 650;
   line-height: 1;
 }
 
@@ -12,9 +13,13 @@ button::after {
   border: none;
 }
 
+button[disabled] {
+  opacity: 0.52;
+}
+
 .uni-tag {
   border-radius: 999rpx !important;
-  padding: 4rpx 16rpx !important;
+  padding: 4rpx 14rpx !important;
 }
 
 .uni-tag--primary,

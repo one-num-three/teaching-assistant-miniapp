@@ -328,9 +328,14 @@ onShow(refreshPage);
 @import '@/styles/variables.scss';
 @import '@/styles/mixins.scss';
 
+.content-layer {
+  display: flex;
+  flex-direction: column;
+}
+
 .mine-hero {
-  @include ink-header(360rpx);
-  padding: 64rpx 34rpx 74rpx;
+  @include ink-header(344rpx);
+  padding: 64rpx 34rpx 68rpx;
   box-sizing: border-box;
 }
 
@@ -376,12 +381,12 @@ onShow(refreshPage);
   display: flex;
   align-items: center;
   gap: 28rpx;
-  margin-top: 50rpx;
+  margin-top: 42rpx;
 }
 
 .avatar {
-  width: 116rpx;
-  height: 116rpx;
+  width: 108rpx;
+  height: 108rpx;
   border-radius: 50%;
   background: $paper-light;
   border: 4rpx solid rgba(255, 255, 255, 0.58);
@@ -395,6 +400,7 @@ onShow(refreshPage);
 
 .name {
   color: #fff;
+  font-family: $font-family-display;
   font-size: 36rpx;
   font-weight: 700;
 }
@@ -407,8 +413,8 @@ onShow(refreshPage);
 .stats-card {
   @include soft-card;
   display: flex;
-  padding: 28rpx 0;
-  margin-bottom: 28rpx;
+  padding: 25rpx 0;
+  margin-bottom: 24rpx;
 }
 
 .stat-item {
@@ -426,7 +432,8 @@ onShow(refreshPage);
 
 .num {
   color: $ink-blue;
-  font-size: 40rpx;
+  font-family: $font-family-display;
+  font-size: 38rpx;
   font-weight: 800;
 }
 
@@ -437,8 +444,12 @@ onShow(refreshPage);
 
 .dev-panel {
   @include soft-card;
-  padding: 24rpx;
-  margin-bottom: 30rpx;
+  order: 99;
+  padding: 22rpx;
+  margin: 30rpx 0 0;
+  border-style: dashed;
+  background: rgba(255, 254, 250, 0.54);
+  box-shadow: none;
 }
 
 .section-row {
@@ -450,12 +461,14 @@ onShow(refreshPage);
 
 .section-title-small {
   color: $text-primary;
-  font-size: 30rpx;
+  font-size: 29rpx;
   font-weight: 700;
 }
 
 .with-space {
-  margin: 10rpx 8rpx 18rpx;
+  margin: 12rpx 2rpx 18rpx;
+  padding-left: 16rpx;
+  border-left: 5rpx solid $green;
 }
 
 .dev-current {
@@ -475,7 +488,7 @@ onShow(refreshPage);
   align-items: center;
   justify-content: center;
   padding: 0 8rpx;
-  border-radius: 14rpx;
+  border-radius: 8rpx;
   border: 1rpx solid rgba(9, 86, 140, 0.16);
   background: $paper-light;
   color: $text-secondary;
@@ -507,7 +520,7 @@ onShow(refreshPage);
 
 .debug-cell {
   padding: 16rpx 8rpx;
-  border-radius: 14rpx;
+  border-radius: 8rpx;
   background: rgba(31, 78, 95, 0.06);
   text-align: center;
 }
@@ -557,8 +570,8 @@ onShow(refreshPage);
 .project-mini-card {
   @include soft-card;
   min-height: 88rpx;
-  padding: 24rpx 28rpx;
-  margin-bottom: 18rpx;
+  padding: 22rpx 24rpx;
+  margin-bottom: 14rpx;
 }
 
 .empty-card {
@@ -594,6 +607,7 @@ onShow(refreshPage);
 
 .mini-title {
   color: $text-primary;
+  font-family: $font-family-display;
   font-size: 29rpx;
   font-weight: 700;
 }
@@ -606,12 +620,12 @@ onShow(refreshPage);
 
 .menu-group {
   @include soft-card;
-  margin-top: 24rpx;
+  margin-top: 18rpx;
   overflow: hidden;
 }
 
 .menu-item {
-  min-height: 90rpx;
+  min-height: 92rpx;
   display: flex;
   align-items: center;
   gap: 20rpx;
@@ -628,7 +642,7 @@ onShow(refreshPage);
 .menu-icon {
   width: 34rpx;
   height: 34rpx;
-  border-radius: 8rpx;
+  border-radius: 6rpx;
   background: rgba(31, 78, 95, 0.12);
   position: relative;
   flex: 0 0 auto;

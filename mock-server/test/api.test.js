@@ -257,7 +257,8 @@ async function testCompletionConfirmationCreatesHoursOnce() {
   const records = db.volunteer_hours.filter((item) => item.project_id === createdProject._id);
   assert.strictEqual(records.length, 2);
   assert.strictEqual(records.find((item) => item.user_id === 'volunteer-2').hours, 1.5);
-  assert.strictEqual(db.users.find((item) => item.openid === 'volunteer-1').stats.volunteer_hours, 22);
+  const dashboard = await userService.getCurrentUser('volunteer-1');
+  assert.deepStrictEqual(dashboard.stats, { joined_projects: 3, volunteer_hours: 4, leader_count: 2 });
   await assertRejectsWithCode(
     () => projectService.reviewProjectCompletion('admin-1', createdProject._id, { action: 'approve' }),
     'INVALID_STATUS'
@@ -344,6 +345,17 @@ async function testVolunteerCertificateUsesConfirmedRecords() {
   assert.strictEqual(certificate.records.length, 1);
 }
 
+async function testDashboardStatsAreCalculatedFromBusinessRecords() {
+  await resetDb();
+  const db = readDb();
+  const user = db.users.find((item) => item.openid === 'volunteer-1');
+  user.stats = { joined_projects: 999, volunteer_hours: 999, leader_count: 999 };
+  await writeDb(db);
+
+  const dashboard = await userService.getCurrentUser('volunteer-1');
+  assert.deepStrictEqual(dashboard.stats, { joined_projects: 2, volunteer_hours: 2, leader_count: 1 });
+}
+
 async function main() {
   await testUserProfileUpdate();
   await testPublishPermissionAndProjectVisible();
@@ -360,6 +372,7 @@ async function main() {
   await testAdminCanEditProjectPositions();
   await testReimbursementAdminWorkflow();
   await testVolunteerCertificateUsesConfirmedRecords();
+  await testDashboardStatsAreCalculatedFromBusinessRecords();
   await resetDb();
   console.log('mock api tests passed');
 }

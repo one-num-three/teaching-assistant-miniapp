@@ -27,6 +27,45 @@ function assertAdmin(user) {
   }
 }
 
+function calculateDashboardStats(db, user) {
+  const userId = user.openid;
+  const confirmedHours = db.volunteer_hours.filter((item) => item.user_id === userId);
+  const joinedProjectIds = new Set(confirmedHours.map((item) => item.project_id));
+  const leaderProjectIds = new Set(
+    confirmedHours
+      .filter((item) => item.position_key === 'lecturer')
+      .map((item) => item.project_id)
+  );
+
+  db.projects.forEach((project) => {
+    if (['draft', 'cancelled'].includes(project.project_status)) return;
+    const isLeader = project.leader?.user_id === userId;
+    const isMember = Object.values(project.positions || {}).some((position) =>
+      (position.members || []).some((member) => member.user_id === userId)
+    );
+    if (!isLeader && !isMember) return;
+
+    joinedProjectIds.add(project._id);
+    if (isLeader && project.project_status === 'completed') leaderProjectIds.add(project._id);
+  });
+
+  return {
+    joined_projects: joinedProjectIds.size,
+    volunteer_hours: Math.round(confirmedHours.reduce((sum, item) => sum + Number(item.hours || 0), 0) * 100) / 100,
+    leader_count: leaderProjectIds.size
+  };
+}
+
+function buildCurrentUser(db, userId) {
+  const user = assertUser(findUser(db, userId));
+  return clone({ ...user, stats: calculateDashboardStats(db, user) });
+}
+
+async function getCurrentUser(userId) {
+  const db = readDb();
+  return buildCurrentUser(db, userId);
+}
+
 async function updateUserProfile(userId, payload) {
   const db = readDb();
   const user = assertUser(findUser(db, userId));
@@ -40,7 +79,7 @@ async function updateUserProfile(userId, payload) {
 
   user.updated_at = Date.now();
   await writeDb(db);
-  return clone(user);
+  return buildCurrentUser(db, userId);
 }
 
 async function listNotifications(userId) {
@@ -201,6 +240,7 @@ async function getVolunteerCertificate(userId) {
 }
 
 module.exports = {
+  getCurrentUser,
   listFavorites,
   listAdminReimbursements,
   listNotifications,

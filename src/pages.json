@@ -143,13 +143,13 @@
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "支教管理",
-    "navigationBarBackgroundColor": "#F2F4F8",
-    "backgroundColor": "#F2F4F8"
+    "navigationBarBackgroundColor": "#F2F4F1",
+    "backgroundColor": "#F2F4F1"
   },
   "tabBar": {
-    "color": "#8394A6",
-    "selectedColor": "#09568C",
-    "backgroundColor": "#FFFFFF",
+    "color": "#879190",
+    "selectedColor": "#234B59",
+    "backgroundColor": "#FFFEFA",
     "borderStyle": "white",
     "list": [
       {

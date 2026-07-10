@@ -95,8 +95,7 @@ async function route(req, res) {
   }
 
   if (method === 'GET' && pathname === '/api/me') {
-    const db = readDb();
-    return ok(res, getUser(db, userId));
+    return ok(res, await userService.getCurrentUser(userId));
   }
 
   if (method === 'POST' && pathname === '/api/me') {
