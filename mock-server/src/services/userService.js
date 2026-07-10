@@ -1,4 +1,5 @@
 const { clone, readDb, writeDb } = require('./store');
+const ADMIN_ROLES = ['admin', 'super_admin', 'reviewer'];
 
 function findUser(db, userId) {
   return db.users.find((user) => user.id === userId || user.openid === userId);
@@ -18,6 +19,12 @@ function createError(message, status = 500, code = 'ERROR') {
   err.status = status;
   err.code = code;
   return err;
+}
+
+function assertAdmin(user) {
+  if (!user?.roles?.some((role) => ADMIN_ROLES.includes(role))) {
+    throw createError('No admin permission', 403, 'NO_PERMISSION');
+  }
 }
 
 async function updateUserProfile(userId, payload) {
@@ -111,6 +118,12 @@ async function listReimbursements(userId) {
   );
 }
 
+async function listAdminReimbursements(userId) {
+  const db = readDb();
+  assertAdmin(assertUser(findUser(db, userId)));
+  return clone(db.reimbursements.sort((a, b) => b.created_at - a.created_at));
+}
+
 async function submitReimbursement(userId, payload) {
   const db = readDb();
   const user = assertUser(findUser(db, userId));
@@ -136,12 +149,66 @@ async function submitReimbursement(userId, payload) {
   return clone(item);
 }
 
+async function reviewReimbursement(userId, reimbursementId, payload) {
+  const db = readDb();
+  const admin = assertUser(findUser(db, userId));
+  assertAdmin(admin);
+  const item = db.reimbursements.find((entry) => entry._id === reimbursementId);
+  if (!item) throw createError('Reimbursement not found', 404, 'NOT_FOUND');
+  const action = String(payload.action || '');
+  const comment = String(payload.comment || '').trim();
+
+  if (action === 'approve' && item.status === 'pending') item.status = 'approved';
+  else if (action === 'reject' && item.status === 'pending') {
+    if (!comment) throw createError('Rejection comment is required', 400, 'COMMENT_REQUIRED');
+    item.status = 'rejected';
+  } else if (action === 'paid' && item.status === 'approved') item.status = 'paid';
+  else throw createError('Invalid reimbursement transition', 409, 'INVALID_STATUS');
+
+  item.review_comment = comment;
+  item.reviewed_by = admin.openid;
+  item.reviewer_name = admin.name;
+  item.updated_at = Date.now();
+  db.notifications.unshift({
+    _id: `notification-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    user_id: item.user_id,
+    title: action === 'reject' ? '报销申请已驳回' : action === 'paid' ? '报销款项已打款' : '报销申请已通过',
+    content: comment || `${item.title} · ¥${item.amount}`,
+    reimbursement_id: item._id,
+    read: false,
+    created_at: Date.now()
+  });
+  await writeDb(db);
+  return clone(item);
+}
+
+async function getVolunteerCertificate(userId) {
+  const db = readDb();
+  const user = assertUser(findUser(db, userId));
+  const records = db.volunteer_hours
+    .filter((item) => item.user_id === user.openid)
+    .sort((a, b) => a.project_date.localeCompare(b.project_date));
+  const totalHours = Math.round(records.reduce((sum, item) => sum + Number(item.hours || 0), 0) * 100) / 100;
+  return clone({
+    certificate_no: `VOL-${user.openid.toUpperCase()}-${String(records.length).padStart(3, '0')}`,
+    user_name: user.name,
+    college: user.college || '',
+    total_hours: totalHours,
+    project_count: new Set(records.map((item) => item.project_id)).size,
+    issued_at: Date.now(),
+    records
+  });
+}
+
 module.exports = {
   listFavorites,
+  listAdminReimbursements,
   listNotifications,
   listReimbursements,
   markAllNotificationsRead,
   markNotificationRead,
+  getVolunteerCertificate,
+  reviewReimbursement,
   submitReimbursement,
   toggleFavorite,
   updateUserProfile

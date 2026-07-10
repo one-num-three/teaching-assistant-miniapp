@@ -102,6 +102,27 @@ function createSeedDb() {
         updated_at: now - 80000000
       }
     ],
+    lesson_versions: [
+      {
+        _id: 'lesson-version-seed-1',
+        project_id: 'project-1',
+        project_title: '趣味科普：地球的呼吸',
+        title: '趣味科普：地球的呼吸教案',
+        file_id: 'local-file-project-1',
+        file_name: '趣味科普地球的呼吸.pdf',
+        file_type: 'PDF',
+        size: '2.1 MB',
+        content: '课程目标：帮助学生理解地球生态与低碳生活的关系。\n教学流程：通过图片导入、实验演示、小组讨论和互动问答完成课堂。\n材料准备：地球仪、树叶样本、卡片和彩色贴纸。',
+        version: 1,
+        submitter_id: 'volunteer-1',
+        submitter_name: '王明',
+        submitted_at: now - 72000000,
+        review_status: 'approved',
+        review_comment: '教案流程完整，可以开展招募。',
+        reviewer_name: '陈思',
+        created_at: now - 72000000
+      }
+    ],
     volunteer_hours: [
       {
         _id: 'hours-seed-1',

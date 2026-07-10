@@ -137,6 +137,14 @@ async function route(req, res) {
     return ok(res, await projectService.listVolunteerHours(userId));
   }
 
+  if (method === 'GET' && pathname === '/api/me/volunteer-certificate') {
+    return ok(res, await userService.getVolunteerCertificate(userId));
+  }
+
+  if (method === 'GET' && pathname === '/api/admin/reimbursements') {
+    return ok(res, await userService.listAdminReimbursements(userId));
+  }
+
   if (method === 'POST' && pathname === '/api/projects') {
     return ok(res, await projectService.publishProject(userId, await readBody(req)));
   }
@@ -178,6 +186,11 @@ async function route(req, res) {
     return ok(res, await userService.submitReimbursement(userId, await readBody(req)));
   }
 
+  const reimbursementMatch = pathname.match(/^\/api\/reimbursements\/([^/]+)\/review$/);
+  if (method === 'POST' && reimbursementMatch) {
+    return ok(res, await userService.reviewReimbursement(userId, decodeURIComponent(reimbursementMatch[1]), await readBody(req)));
+  }
+
   const materialMatch = pathname.match(/^\/api\/materials\/([^/]+)\/favorite$/);
   if (method === 'POST' && materialMatch) {
     return ok(res, await userService.toggleFavorite(userId, decodeURIComponent(materialMatch[1])));
@@ -189,6 +202,7 @@ async function route(req, res) {
     const action = projectMatch[2];
     if (method === 'GET' && !action) return ok(res, await projectService.getProject(projectId));
     if (method === 'GET' && action === 'reviews') return ok(res, await projectService.getProjectReviews(userId, projectId));
+    if (method === 'GET' && action === 'lesson-versions') return ok(res, await projectService.getLessonVersions(userId, projectId));
     if (method === 'POST' && action === 'claim-leader') return ok(res, await projectService.claimLeader(userId, projectId));
     if (method === 'POST' && action === 'submit-lesson') {
       return ok(res, await projectService.submitLesson(userId, projectId, await readBody(req)));

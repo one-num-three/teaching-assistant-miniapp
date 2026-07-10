@@ -35,6 +35,13 @@
       }
     },
     {
+      "path": "pages/mine/certificate",
+      "style": {
+        "navigationBarTitleText": "志愿服务证明",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/mine/notifications",
       "style": {
         "navigationBarTitleText": "通知中心",
@@ -108,6 +115,13 @@
       "path": "pages/admin/completion",
       "style": {
         "navigationBarTitleText": "项目完成确认台",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/admin/reimbursements",
+      "style": {
+        "navigationBarTitleText": "报销审核台",
         "navigationStyle": "custom"
       }
     },

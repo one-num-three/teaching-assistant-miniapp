@@ -17,19 +17,19 @@
 import { computed, ref } from 'vue';
 import { onLoad, onShow } from '@dcloudio/uni-app';
 import { getMaterialDetail } from '@/api/material';
-import { getProjectDetail } from '@/api/project';
+import { getLessonVersions, getProjectDetail } from '@/api/project';
 import { getTempFileURL, openDocument } from '@/utils/platform';
 import { getDocumentType, splitPreviewParagraphs } from '@/utils/document';
 const loading = ref(true); const document = ref<any>(null);
 const paragraphs = computed(() => splitPreviewParagraphs(document.value?.content || '', document.value?.outline?.length ? document.value.outline : ['暂无正文内容。']));
 const slides = computed(() => { const stored = document.value?.slides; if (Array.isArray(stored) && stored.length) return stored; const source = splitPreviewParagraphs(document.value?.content || '', document.value?.outline || []); const fallback = source.length ? source : ['课程导入', '核心内容', '互动练习', '总结反馈']; return fallback.map((item, index) => ({ title: item.replace(/^.+?[：:]/, '').slice(0, 22) || `第 ${index + 1} 页`, points: [item, index === fallback.length - 1 ? '课堂总结与反馈' : '请结合讲解与互动活动展开'] })); });
 const goBack = () => uni.navigateBack();
-const load = async (source: string, id: string) => { loading.value = true; try { if (source === 'project') { const project = await getProjectDetail(id); const lesson = project.lesson_plan; if (!lesson) throw new Error('暂无教案'); document.value = { title: lesson.title || project.title, fileName: lesson.file_name || '教案文件', fileId: lesson.file_id, size: lesson.size, type: getDocumentType(lesson.file_name, lesson.file_type), content: lesson.content, outline: project.outline || [], slides: lesson.slides || [] }; } else { const material = await getMaterialDetail(id); document.value = { title: material.title || material.file_name, fileName: material.file_name || material.title, fileId: material.file_id, size: material.size || material.count, type: getDocumentType(material.file_name, material.type), content: material.preview_content || material.content, outline: material.outline || [], slides: material.slides || [] }; } } catch { document.value = null; uni.showToast({ title: '文档加载失败', icon: 'none' }); } finally { loading.value = false; } };
+const load = async (source: string, id: string, version?: string) => { loading.value = true; try { if (source === 'project') { const project = await getProjectDetail(id); let lesson = project.lesson_plan; if (version) { const versions = await getLessonVersions(id); lesson = versions.find((item: any) => Number(item.version) === Number(version)); } if (!lesson) throw new Error('暂无教案'); document.value = { title: lesson.title || project.title, fileName: lesson.file_name || '教案文件', fileId: lesson.file_id, size: lesson.size, type: getDocumentType(lesson.file_name, lesson.file_type), content: lesson.content, outline: project.outline || [], slides: lesson.slides || [] }; } else { const material = await getMaterialDetail(id); document.value = { title: material.title || material.file_name, fileName: material.file_name || material.title, fileId: material.file_id, size: material.size || material.count, type: getDocumentType(material.file_name, material.type), content: material.preview_content || material.content, outline: material.outline || [], slides: material.slides || [] }; } } catch { document.value = null; uni.showToast({ title: '文档加载失败', icon: 'none' }); } finally { loading.value = false; } };
 const openOriginal = async () => { const fileId = document.value?.fileId; if (!fileId || String(fileId).startsWith('local')) { uni.showToast({ title: '当前正在查看本地预览', icon: 'none' }); return; } try { uni.showLoading({ title: '正在打开文件' }); const list = await getTempFileURL([fileId]); const url = list[0]?.tempFileURL; if (!url) throw new Error('no file'); openDocument(url, document.value.type?.toLowerCase()); } catch { uni.showToast({ title: '原文件打开失败', icon: 'none' }); } finally { uni.hideLoading(); } };
 const loadFromRoute = (options?: any) => {
   const page = getCurrentPages().slice(-1)[0] as any;
   const query = options || page?.options || {};
-  load(query.source || 'material', query.id || '');
+  load(query.source || 'material', query.id || '', query.version);
 };
 onLoad((options: any) => loadFromRoute(options));
 onShow(() => loadFromRoute());

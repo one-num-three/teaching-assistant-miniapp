@@ -138,6 +138,12 @@
           <text class="pill amber menu-pill">管理员</text>
           <text class="arrow">›</text>
         </view>
+        <view class="menu-item" @click="goReimbursementReview">
+          <view class="menu-icon timer"></view>
+          <text>报销审核台</text>
+          <text class="pill amber menu-pill">管理员</text>
+          <text class="arrow">›</text>
+        </view>
       </view>
     </view>
   </view>
@@ -309,6 +315,10 @@ const goReimbursements = () => {
 
 const goProjectManage = () => {
   uni.navigateTo({ url: '/pages/admin/projects' });
+};
+
+const goReimbursementReview = () => {
+  uni.navigateTo({ url: '/pages/admin/reimbursements' });
 };
 
 onShow(refreshPage);

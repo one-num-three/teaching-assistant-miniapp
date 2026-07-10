@@ -24,7 +24,7 @@ const goBack = () => uni.navigateBack();
 const formatTime = (value: number) => new Date(value).toLocaleString('zh-CN', { hour12: false });
 const load = async () => { loading.value = true; try { items.value = await getNotifications(); } catch { uni.showToast({ title: '通知加载失败', icon: 'none' }); } finally { loading.value = false; } };
 const markAll = async () => { if (!unreadCount.value) return; await markAllNotificationsRead(); items.value = items.value.map((item) => ({ ...item, read: true })); };
-const openNotice = async (item: any) => { try { if (!item.read) { await markNotificationRead(item._id); item.read = true; } if (item.project_id) uni.navigateTo({ url: `/pages/project/detail?id=${item.project_id}` }); } catch { uni.showToast({ title: '通知处理失败', icon: 'none' }); } };
+const openNotice = async (item: any) => { try { if (!item.read) { await markNotificationRead(item._id); item.read = true; } if (item.project_id) uni.navigateTo({ url: `/pages/project/detail?id=${item.project_id}` }); else if (item.reimbursement_id) uni.navigateTo({ url: '/pages/mine/reimbursements' }); } catch { uni.showToast({ title: '通知处理失败', icon: 'none' }); } };
 onShow(load);
 </script>
 

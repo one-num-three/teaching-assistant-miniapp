@@ -232,6 +232,11 @@ async function testReviewHistoryAndRevisionVersion() {
   assert.strictEqual(history.length, 1);
   assert.strictEqual(history[0].comment, 'please add safety notes');
   await assertRejectsWithCode(() => projectService.getProjectReviews('volunteer-2', 'project-2'), 'NO_PERMISSION');
+  const versions = await projectService.getLessonVersions('volunteer-1', 'project-2');
+  assert.strictEqual(versions.length, 2);
+  assert.strictEqual(versions[0].title, 'v2');
+  assert.strictEqual(versions[1].title, 'v1');
+  assert.strictEqual(versions[1].review_status, 'rejected');
 }
 
 async function testCompletionConfirmationCreatesHoursOnce() {
@@ -314,6 +319,31 @@ async function testAdminCanEditProjectPositions() {
   );
 }
 
+async function testReimbursementAdminWorkflow() {
+  await resetDb();
+  let item = await userService.submitReimbursement('volunteer-1', {
+    title: '打印材料', amount: 20, project_name: '折纸课'
+  });
+  await assertRejectsWithCode(
+    () => userService.reviewReimbursement('volunteer-2', item._id, { action: 'approve' }),
+    'NO_PERMISSION'
+  );
+  item = await userService.reviewReimbursement('admin-1', item._id, { action: 'approve', comment: '凭证完整' });
+  assert.strictEqual(item.status, 'approved');
+  item = await userService.reviewReimbursement('admin-1', item._id, { action: 'paid', comment: '已转账' });
+  assert.strictEqual(item.status, 'paid');
+  const db = readDb();
+  assert(db.notifications.some((entry) => entry.reimbursement_id === item._id && entry.user_id === 'volunteer-1'));
+}
+
+async function testVolunteerCertificateUsesConfirmedRecords() {
+  await resetDb();
+  const certificate = await userService.getVolunteerCertificate('volunteer-1');
+  assert.strictEqual(certificate.total_hours, 2);
+  assert.strictEqual(certificate.project_count, 1);
+  assert.strictEqual(certificate.records.length, 1);
+}
+
 async function main() {
   await testUserProfileUpdate();
   await testPublishPermissionAndProjectVisible();
@@ -328,6 +358,8 @@ async function main() {
   await testAdminProjectChangeControls();
   await testPersonalCenterCollectionsAndNotifications();
   await testAdminCanEditProjectPositions();
+  await testReimbursementAdminWorkflow();
+  await testVolunteerCertificateUsesConfirmedRecords();
   await resetDb();
   console.log('mock api tests passed');
 }

@@ -46,3 +46,18 @@ export const getReimbursements = async (): Promise<any[]> => request<any[]>('/me
 export const submitReimbursement = async (payload: any): Promise<any> => {
   return request<any>('/me/reimbursements', { method: 'POST', data: payload });
 };
+
+export const getAdminReimbursements = async (): Promise<any[]> => request<any[]>('/admin/reimbursements');
+
+export const reviewReimbursement = async (
+  reimbursementId: string,
+  action: 'approve' | 'reject' | 'paid',
+  comment?: string
+): Promise<any> => {
+  return request<any>(`/reimbursements/${reimbursementId}/review`, {
+    method: 'POST',
+    data: { action, comment }
+  });
+};
+
+export const getVolunteerCertificate = async (): Promise<any> => request<any>('/me/volunteer-certificate');

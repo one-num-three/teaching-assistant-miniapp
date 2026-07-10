@@ -98,6 +98,8 @@ function createMaterialFromProject(db, project) {
     tag: 'auto',
     type: project.lesson_plan.file_type || inferFileType(project.lesson_plan.file_name),
     count: 'approved lesson',
+    preview_content: project.lesson_plan.content || '',
+    outline: project.outline || [],
     date: new Date().toISOString().slice(0, 10),
     source_project_id: project._id,
     source_project_title: project.title,
@@ -196,6 +198,21 @@ async function getProjectReviews(userId, projectId) {
     db.lesson_reviews
       .filter((item) => item.project_id === projectId)
       .sort((a, b) => b.created_at - a.created_at)
+  );
+}
+
+async function getLessonVersions(userId, projectId) {
+  const db = readDb();
+  const user = getUser(db, userId);
+  const project = assertFound(db.projects.find((item) => item._id === projectId), 'Project not found');
+  const isMember = projectMembers(project).some((member) => member.user_id === user.openid);
+  if (!ADMIN_ROLES.some((role) => user.roles?.includes(role)) && !isMember) {
+    throw createError('No permission to view lesson versions', 403, 'NO_PERMISSION');
+  }
+  return clone(
+    db.lesson_versions
+      .filter((item) => item.project_id === projectId)
+      .sort((a, b) => b.version - a.version)
   );
 }
 
@@ -327,6 +344,7 @@ async function submitLesson(userId, projectId, payload) {
     throw createError('Current status does not allow lesson submission', 409, 'INVALID_STATUS');
   }
 
+  const lessonVersion = Number(project.lesson_plan?.version || 0) + 1;
   project.lesson_plan = {
     title: payload.title || `${project.title} lesson plan`,
     file_id: payload.fileId || `local-lesson-${projectId}-${Date.now()}`,
@@ -337,8 +355,16 @@ async function submitLesson(userId, projectId, payload) {
     submitter_name: user.name,
     content: String(payload.content || '').trim(),
     file_type: inferFileType(payload.fileName, payload.fileType),
-    version: Number(project.lesson_plan?.version || 0) + 1
+    version: lessonVersion
   };
+  db.lesson_versions.unshift({
+    _id: `lesson-version-${projectId}-${lessonVersion}-${Date.now()}`,
+    project_id: project._id,
+    project_title: project.title,
+    ...project.lesson_plan,
+    review_status: 'pending_review',
+    created_at: Date.now()
+  });
   project.lesson_status = 'pending_review';
   project.project_status = 'pending_review';
   project.updated_at = Date.now();
@@ -523,6 +549,16 @@ async function reviewLesson(userId, projectId, payload) {
     throw createError('Invalid review action', 400, 'INVALID_ACTION');
   }
 
+  const currentVersion = db.lesson_versions.find(
+    (item) => item.project_id === project._id && item.version === Number(project.lesson_plan?.version || 0)
+  );
+  if (currentVersion) {
+    currentVersion.review_status = payload.action === 'approve' ? 'approved' : 'rejected';
+    currentVersion.review_comment = payload.comment || '';
+    currentVersion.reviewed_at = Date.now();
+    currentVersion.reviewer_name = user.name;
+  }
+
   project.updated_at = Date.now();
   await writeDb(db);
   return clone(project);
@@ -603,6 +639,7 @@ module.exports = {
   claimLeader,
   claimPosition,
   getProject,
+  getLessonVersions,
   getProjectReviews,
   listAdminProjects,
   listCompletionProjects,

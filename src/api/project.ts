@@ -62,6 +62,10 @@ export const getProjectReviews = async (projectId: string): Promise<any[]> => {
   return request<any[]>(`/projects/${projectId}/reviews`);
 };
 
+export const getLessonVersions = async (projectId: string): Promise<any[]> => {
+  return request<any[]>(`/projects/${projectId}/lesson-versions`);
+};
+
 export const submitProjectCompletion = async (projectId: string, payload: any): Promise<any> => {
   return request<any>(`/projects/${projectId}/complete`, {
     method: 'POST',
