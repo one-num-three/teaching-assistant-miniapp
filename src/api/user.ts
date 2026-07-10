@@ -26,3 +26,7 @@ export const resetDevData = async (): Promise<void> => {
   await request('/dev/reset', { method: 'POST' });
   setDevUserId('admin-1');
 };
+
+export const getVolunteerHours = async (): Promise<any[]> => {
+  return request<any[]>('/me/volunteer-hours');
+};

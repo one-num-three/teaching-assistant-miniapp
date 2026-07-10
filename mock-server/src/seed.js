@@ -100,6 +100,34 @@ function createSeedDb() {
         updated_at: now - 80000000
       }
     ],
+    volunteer_hours: [
+      {
+        _id: 'hours-seed-1',
+        user_id: 'volunteer-1',
+        user_name: '王明',
+        project_id: 'history-project-1',
+        project_title: '古诗诵读与飞花令',
+        project_date: '2025-07-07',
+        position_key: 'lecturer',
+        position_name: '项目负责人',
+        hours: 2,
+        confirmed_at: now - 86400000 * 3,
+        confirmed_by: 'admin-1'
+      },
+      {
+        _id: 'hours-seed-2',
+        user_id: 'volunteer-2',
+        user_name: '李华',
+        project_id: 'history-project-2',
+        project_title: '环保小卫士主题活动',
+        project_date: '2025-06-21',
+        position_key: 'assistant',
+        position_name: '助教',
+        hours: 3,
+        confirmed_at: now - 86400000 * 8,
+        confirmed_by: 'admin-1'
+      }
+    ],
     materials: [
       {
         _id: 'material-1',

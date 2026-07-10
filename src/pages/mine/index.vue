@@ -95,7 +95,7 @@
           <text class="pill amber menu-pill">待认证</text>
           <text class="arrow">›</text>
         </view>
-        <view class="menu-item">
+        <view class="menu-item" @click="goHours">
           <view class="menu-icon chart"></view>
           <text>志愿服务时长统计</text>
           <text class="arrow">›</text>
@@ -123,6 +123,12 @@
         <view class="menu-item" @click="goReview">
           <view class="menu-icon doc"></view>
           <text>教案审核台</text>
+          <text class="pill amber menu-pill">管理员</text>
+          <text class="arrow">›</text>
+        </view>
+        <view class="menu-item" @click="goCompletionReview">
+          <view class="menu-icon timer"></view>
+          <text>项目完成确认台</text>
           <text class="pill amber menu-pill">管理员</text>
           <text class="arrow">›</text>
         </view>
@@ -265,6 +271,14 @@ const goReview = () => {
 
 const goAdmin = () => {
   uni.navigateTo({ url: '/pages/admin/publish' });
+};
+
+const goHours = () => {
+  uni.navigateTo({ url: '/pages/mine/hours' });
+};
+
+const goCompletionReview = () => {
+  uni.navigateTo({ url: '/pages/admin/completion' });
 };
 
 onShow(refreshPage);

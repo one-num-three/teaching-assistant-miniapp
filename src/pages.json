@@ -28,6 +28,13 @@
       }
     },
     {
+      "path": "pages/mine/hours",
+      "style": {
+        "navigationBarTitleText": "志愿服务时长",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/project/detail",
       "style": {
         "navigationBarTitleText": "项目详情",
@@ -42,6 +49,13 @@
       }
     },
     {
+      "path": "pages/project/complete",
+      "style": {
+        "navigationBarTitleText": "提交项目完成记录",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/admin/review",
       "style": {
         "navigationBarTitleText": "教案审核台",
@@ -52,6 +66,13 @@
       "path": "pages/admin/publish",
       "style": {
         "navigationBarTitleText": "发布档期",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/admin/completion",
+      "style": {
+        "navigationBarTitleText": "项目完成确认台",
         "navigationStyle": "custom"
       }
     }

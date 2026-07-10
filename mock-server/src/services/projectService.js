@@ -129,8 +129,34 @@ function logReview(db, project, user, action, comment = '') {
     reviewer_name: user.name,
     action,
     comment,
+    lesson_version: project.lesson_plan?.version || 0,
     created_at: Date.now()
   });
+}
+
+function projectMembers(project) {
+  const names = {
+    lecturer: '项目负责人',
+    assistant: '助教',
+    ppt: 'PPT',
+    photographer: '摄影',
+    logistics: '场务'
+  };
+  const result = [];
+  Object.entries(project.positions || {}).forEach(([positionKey, position]) => {
+    (position.members || []).forEach((member) => {
+      result.push({ ...member, position_key: positionKey, position_name: names[positionKey] || positionKey });
+    });
+  });
+  return result;
+}
+
+function parseHours(value) {
+  const hours = Number(value);
+  if (!Number.isFinite(hours) || hours < 0 || hours > 24) {
+    throw createError('Service hours must be between 0 and 24', 400, 'INVALID_HOURS');
+  }
+  return Math.round(hours * 100) / 100;
 }
 
 async function listProjects() {
@@ -147,6 +173,40 @@ async function listAdminProjects(userId) {
 async function getProject(projectId) {
   const db = readDb();
   return clone(assertFound(db.projects.find((item) => item._id === projectId), 'Project not found'));
+}
+
+async function getProjectReviews(userId, projectId) {
+  const db = readDb();
+  const user = getUser(db, userId);
+  const project = assertFound(db.projects.find((item) => item._id === projectId), 'Project not found');
+  if (!ADMIN_ROLES.some((role) => user.roles?.includes(role)) && project.leader?.user_id !== user.openid) {
+    throw createError('No permission to view review history', 403, 'NO_PERMISSION');
+  }
+  return clone(
+    db.lesson_reviews
+      .filter((item) => item.project_id === projectId)
+      .sort((a, b) => b.created_at - a.created_at)
+  );
+}
+
+async function listCompletionProjects(userId) {
+  const db = readDb();
+  assertAdmin(getUser(db, userId));
+  return clone(
+    db.projects
+      .filter((project) => project.project_status === 'completion_pending')
+      .sort((a, b) => Number(b.completion?.submitted_at || 0) - Number(a.completion?.submitted_at || 0))
+  );
+}
+
+async function listVolunteerHours(userId) {
+  const db = readDb();
+  getUser(db, userId);
+  return clone(
+    db.volunteer_hours
+      .filter((item) => item.user_id === userId)
+      .sort((a, b) => b.confirmed_at - a.confirmed_at)
+  );
 }
 
 async function publishProject(userId, payload) {
@@ -231,13 +291,161 @@ async function submitLesson(userId, projectId, payload) {
     size: payload.size || '2.4 MB',
     submitted_at: Date.now(),
     submitter_id: user.openid,
-    submitter_name: user.name
+    submitter_name: user.name,
+    content: String(payload.content || '').trim(),
+    version: Number(project.lesson_plan?.version || 0) + 1
   };
   project.lesson_status = 'pending_review';
   project.project_status = 'pending_review';
   project.updated_at = Date.now();
   pushNotification(db, user.openid, 'Lesson submitted', `${project.title} is waiting for admin review.`, project._id);
 
+  await writeDb(db);
+  return clone(project);
+}
+
+async function submitProjectCompletion(userId, projectId, payload) {
+  const db = readDb();
+  const user = getUser(db, userId);
+  const project = assertFound(db.projects.find((item) => item._id === projectId), 'Project not found');
+
+  if (project.leader?.user_id !== user.openid) {
+    throw createError('Only the project leader can submit completion', 403, 'NO_PERMISSION');
+  }
+  if (!['recruiting', 'locked'].includes(project.project_status)) {
+    throw createError('Current project status does not allow completion submission', 409, 'INVALID_STATUS');
+  }
+
+  const members = projectMembers(project);
+  if (!members.length) throw createError('Project has no participants', 409, 'NO_PARTICIPANTS');
+  const rawHours = payload.participantHours || {};
+  const participants = members.map((member) => ({
+    ...member,
+    hours: parseHours(rawHours[member.user_id] ?? payload.defaultHours ?? 0)
+  }));
+
+  project.completion = {
+    status: 'pending_confirmation',
+    summary: String(payload.summary || '').trim(),
+    participants,
+    submitted_at: Date.now(),
+    submitted_by: user.openid,
+    submitted_by_name: user.name,
+    previous_status: project.project_status,
+    admin_comment: ''
+  };
+  project.project_status = 'completion_pending';
+  project.updated_at = Date.now();
+  await writeDb(db);
+  return clone(project);
+}
+
+async function reviewProjectCompletion(userId, projectId, payload) {
+  const db = readDb();
+  const user = getUser(db, userId);
+  assertAdmin(user);
+  const project = assertFound(db.projects.find((item) => item._id === projectId), 'Project not found');
+  if (project.project_status !== 'completion_pending' || !project.completion) {
+    throw createError('No pending completion record', 409, 'INVALID_STATUS');
+  }
+  if (!['approve', 'reject'].includes(payload.action)) {
+    throw createError('Invalid review action', 400, 'INVALID_ACTION');
+  }
+
+  const comment = String(payload.comment || '').trim();
+  if (payload.action === 'reject') {
+    if (!comment) throw createError('Rejection comment is required', 400, 'COMMENT_REQUIRED');
+    project.completion.status = 'rejected';
+    project.completion.admin_comment = comment;
+    project.project_status = project.completion.previous_status || 'recruiting';
+  } else {
+    project.completion.status = 'approved';
+    project.completion.admin_comment = comment;
+    project.completion.confirmed_at = Date.now();
+    project.completion.confirmed_by = user.openid;
+    project.project_status = 'completed';
+
+    project.completion.participants.forEach((participant) => {
+      const exists = db.volunteer_hours.some((item) => item.project_id === project._id && item.user_id === participant.user_id);
+      if (exists) return;
+      db.volunteer_hours.unshift({
+        _id: `hours-${Date.now()}-${participant.user_id}`,
+        user_id: participant.user_id,
+        user_name: participant.name,
+        project_id: project._id,
+        project_title: project.title,
+        project_date: project.date,
+        position_key: participant.position_key,
+        position_name: participant.position_name,
+        hours: participant.hours,
+        confirmed_at: project.completion.confirmed_at,
+        confirmed_by: user.openid
+      });
+      const participantUser = db.users.find((item) => item.openid === participant.user_id);
+      if (participantUser) {
+        participantUser.stats = participantUser.stats || {};
+        participantUser.stats.volunteer_hours = Number(participantUser.stats.volunteer_hours || 0) + participant.hours;
+      }
+    });
+  }
+
+  project.updated_at = Date.now();
+  await writeDb(db);
+  return clone(project);
+}
+
+async function cancelProject(userId, projectId, payload) {
+  const db = readDb();
+  assertAdmin(getUser(db, userId));
+  const project = assertFound(db.projects.find((item) => item._id === projectId), 'Project not found');
+  if (['completed', 'cancelled'].includes(project.project_status)) {
+    throw createError('Current project cannot be cancelled', 409, 'INVALID_STATUS');
+  }
+  const reason = String(payload.reason || '').trim();
+  if (!reason) throw createError('Cancellation reason is required', 400, 'CANCEL_REASON_REQUIRED');
+  project.project_status = 'cancelled';
+  project.cancel_reason = reason;
+  project.cancelled_at = Date.now();
+  project.updated_at = Date.now();
+  await writeDb(db);
+  return clone(project);
+}
+
+async function removeProjectMember(userId, projectId, payload) {
+  const db = readDb();
+  const admin = getUser(db, userId);
+  assertAdmin(admin);
+  const project = assertFound(db.projects.find((item) => item._id === projectId), 'Project not found');
+  const positionKey = payload.positionKey;
+  const targetUserId = payload.targetUserId;
+  const reason = String(payload.reason || '').trim();
+  if (!reason) throw createError('Removal reason is required', 400, 'REMOVE_REASON_REQUIRED');
+  if (['completed', 'cancelled', 'completion_pending'].includes(project.project_status)) {
+    throw createError('Current project cannot be changed', 409, 'INVALID_STATUS');
+  }
+
+  if (positionKey === 'lecturer') {
+    if (!['pending_review', 'revision_required'].includes(project.project_status) || project.leader?.user_id !== targetUserId) {
+      throw createError('Leader can only be released before lesson approval', 409, 'INVALID_STATUS');
+    }
+    const leaderUser = getUser(db, targetUserId);
+    project.leader = null;
+    project.positions.lecturer.members = [];
+    project.lesson_plan = null;
+    project.lesson_status = 'not_submitted';
+    project.project_status = 'pending_claim';
+    logClaim(db, project, leaderUser, 'lecturer', 'removed');
+  } else {
+    if (!POSITION_KEYS.includes(positionKey)) throw createError('Invalid position', 400, 'INVALID_POSITION');
+    const position = project.positions[positionKey];
+    const index = position?.members?.findIndex((member) => member.user_id === targetUserId) ?? -1;
+    if (index < 0) throw createError('Member not found in position', 404, 'NOT_FOUND');
+    const [member] = position.members.splice(index, 1);
+    project.project_status = 'recruiting';
+    logClaim(db, project, { openid: member.user_id, name: member.name, avatar: member.avatar }, positionKey, 'removed');
+  }
+  project.updated_at = Date.now();
+  project.member_change_reason = reason;
   await writeDb(db);
   return clone(project);
 }
@@ -346,13 +554,20 @@ async function cancelPosition(userId, projectId, payload) {
 }
 
 module.exports = {
+  cancelProject,
   cancelPosition,
   claimLeader,
   claimPosition,
   getProject,
+  getProjectReviews,
   listAdminProjects,
+  listCompletionProjects,
   listProjects,
+  listVolunteerHours,
   publishProject,
+  removeProjectMember,
+  reviewProjectCompletion,
   reviewLesson,
+  submitProjectCompletion,
   submitLesson
 };

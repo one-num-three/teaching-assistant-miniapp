@@ -125,6 +125,14 @@ async function route(req, res) {
     return ok(res, await projectService.listAdminProjects(userId));
   }
 
+  if (method === 'GET' && pathname === '/api/admin/completions') {
+    return ok(res, await projectService.listCompletionProjects(userId));
+  }
+
+  if (method === 'GET' && pathname === '/api/me/volunteer-hours') {
+    return ok(res, await projectService.listVolunteerHours(userId));
+  }
+
   if (method === 'POST' && pathname === '/api/projects') {
     return ok(res, await projectService.publishProject(userId, await readBody(req)));
   }
@@ -144,6 +152,7 @@ async function route(req, res) {
     const projectId = decodeURIComponent(projectMatch[1]);
     const action = projectMatch[2];
     if (method === 'GET' && !action) return ok(res, await projectService.getProject(projectId));
+    if (method === 'GET' && action === 'reviews') return ok(res, await projectService.getProjectReviews(userId, projectId));
     if (method === 'POST' && action === 'claim-leader') return ok(res, await projectService.claimLeader(userId, projectId));
     if (method === 'POST' && action === 'submit-lesson') {
       return ok(res, await projectService.submitLesson(userId, projectId, await readBody(req)));
@@ -156,6 +165,18 @@ async function route(req, res) {
     }
     if (method === 'POST' && action === 'cancel-position') {
       return ok(res, await projectService.cancelPosition(userId, projectId, await readBody(req)));
+    }
+    if (method === 'POST' && action === 'complete') {
+      return ok(res, await projectService.submitProjectCompletion(userId, projectId, await readBody(req)));
+    }
+    if (method === 'POST' && action === 'review-completion') {
+      return ok(res, await projectService.reviewProjectCompletion(userId, projectId, await readBody(req)));
+    }
+    if (method === 'POST' && action === 'cancel-project') {
+      return ok(res, await projectService.cancelProject(userId, projectId, await readBody(req)));
+    }
+    if (method === 'POST' && action === 'remove-member') {
+      return ok(res, await projectService.removeProjectMember(userId, projectId, await readBody(req)));
     }
   }
 

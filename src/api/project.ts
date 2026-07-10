@@ -57,3 +57,44 @@ export const reviewLesson = async (projectId: string, action: 'approve' | 'rejec
     data: { action, comment }
   });
 };
+
+export const getProjectReviews = async (projectId: string): Promise<any[]> => {
+  return request<any[]>(`/projects/${projectId}/reviews`);
+};
+
+export const submitProjectCompletion = async (projectId: string, payload: any): Promise<any> => {
+  return request<any>(`/projects/${projectId}/complete`, {
+    method: 'POST',
+    data: payload
+  });
+};
+
+export const getCompletionProjects = async (): Promise<any[]> => {
+  return request<any[]>('/admin/completions');
+};
+
+export const reviewProjectCompletion = async (projectId: string, action: 'approve' | 'reject', comment?: string): Promise<any> => {
+  return request<any>(`/projects/${projectId}/review-completion`, {
+    method: 'POST',
+    data: { action, comment }
+  });
+};
+
+export const cancelProject = async (projectId: string, reason: string): Promise<any> => {
+  return request<any>(`/projects/${projectId}/cancel-project`, {
+    method: 'POST',
+    data: { reason }
+  });
+};
+
+export const removeProjectMember = async (
+  projectId: string,
+  positionKey: string,
+  targetUserId: string,
+  reason: string
+): Promise<any> => {
+  return request<any>(`/projects/${projectId}/remove-member`, {
+    method: 'POST',
+    data: { positionKey, targetUserId, reason }
+  });
+};

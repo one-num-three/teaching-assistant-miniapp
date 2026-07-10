@@ -191,6 +191,84 @@ async function testLeaderCannotCancelWithPositionCancelEndpoint() {
   );
 }
 
+async function createApprovedProject(title = 'completed project test') {
+  const project = await projectService.publishProject('admin-1', {
+    title,
+    date: '2026-07-18',
+    start_time: '14:00',
+    end_time: '16:00',
+    location: 'local test community',
+    target_audience: 'primary students',
+    positions: { assistant: 1 }
+  });
+  await projectService.claimLeader('volunteer-1', project._id);
+  await projectService.submitLesson('volunteer-1', project._id, {
+    title: `${title} lesson`,
+    content: 'lesson objective and activity flow'
+  });
+  await projectService.reviewLesson('admin-1', project._id, { action: 'approve', comment: 'ready to recruit' });
+  return project;
+}
+
+async function testReviewHistoryAndRevisionVersion() {
+  await resetDb();
+  await projectService.claimLeader('volunteer-1', 'project-2');
+  await projectService.submitLesson('volunteer-1', 'project-2', { title: 'v1', content: 'first content' });
+  await projectService.reviewLesson('admin-1', 'project-2', { action: 'reject', comment: 'please add safety notes' });
+  let project = await projectService.submitLesson('volunteer-1', 'project-2', { title: 'v2', content: 'updated content' });
+  assert.strictEqual(project.lesson_plan.version, 2);
+  const history = await projectService.getProjectReviews('volunteer-1', 'project-2');
+  assert.strictEqual(history.length, 1);
+  assert.strictEqual(history[0].comment, 'please add safety notes');
+  await assertRejectsWithCode(() => projectService.getProjectReviews('volunteer-2', 'project-2'), 'NO_PERMISSION');
+}
+
+async function testCompletionConfirmationCreatesHoursOnce() {
+  await resetDb();
+  const createdProject = await createApprovedProject();
+  await projectService.claimPosition('volunteer-2', createdProject._id, { positionKey: 'assistant' });
+
+  let project = await projectService.submitProjectCompletion('volunteer-1', createdProject._id, {
+    summary: 'activity completed successfully',
+    participantHours: { 'volunteer-1': 2, 'volunteer-2': 1.5 }
+  });
+  assert.strictEqual(project.project_status, 'completion_pending');
+  assert.strictEqual(project.completion.participants.length, 2);
+
+  project = await projectService.reviewProjectCompletion('admin-1', createdProject._id, { action: 'approve', comment: 'confirmed' });
+  assert.strictEqual(project.project_status, 'completed');
+  const db = readDb();
+  const records = db.volunteer_hours.filter((item) => item.project_id === createdProject._id);
+  assert.strictEqual(records.length, 2);
+  assert.strictEqual(records.find((item) => item.user_id === 'volunteer-2').hours, 1.5);
+  assert.strictEqual(db.users.find((item) => item.openid === 'volunteer-1').stats.volunteer_hours, 22);
+  await assertRejectsWithCode(
+    () => projectService.reviewProjectCompletion('admin-1', createdProject._id, { action: 'approve' }),
+    'INVALID_STATUS'
+  );
+}
+
+async function testAdminProjectChangeControls() {
+  await resetDb();
+  const createdProject = await createApprovedProject('admin change test');
+  await projectService.claimPosition('volunteer-2', createdProject._id, { positionKey: 'assistant' });
+  let project = await projectService.removeProjectMember(
+    'admin-1',
+    createdProject._id,
+    {
+      positionKey: 'assistant',
+      targetUserId: 'volunteer-2',
+      reason: 'participant unavailable'
+    }
+  );
+  assert.strictEqual(project.positions.assistant.members.length, 0);
+  assert.strictEqual(project.project_status, 'recruiting');
+
+  project = await projectService.cancelProject('admin-1', createdProject._id, { reason: 'weather warning' });
+  assert.strictEqual(project.project_status, 'cancelled');
+  assert.strictEqual(project.cancel_reason, 'weather warning');
+}
+
 async function main() {
   await testUserProfileUpdate();
   await testPublishPermissionAndProjectVisible();
@@ -199,6 +277,9 @@ async function main() {
   await testSupportPositionCanBeCancelledWithinTenMinutes();
   await testSupportPositionCancelExpiresAfterTenMinutes();
   await testLeaderCannotCancelWithPositionCancelEndpoint();
+  await testReviewHistoryAndRevisionVersion();
+  await testCompletionConfirmationCreatesHoursOnce();
+  await testAdminProjectChangeControls();
   await resetDb();
   console.log('mock api tests passed');
 }

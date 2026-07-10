@@ -48,6 +48,11 @@
             </view>
 
             <view class="info-block">
+              <text class="info-label">教案摘要与课堂流程</text>
+              <text class="info-value lesson-content">{{ currentProject.lesson_plan?.content || '负责人尚未填写教案摘要，建议退回补充。' }}</text>
+            </view>
+
+            <view class="info-block">
               <text class="info-label">辅助岗位设置</text>
               <view class="chips">
                 <text v-for="item in positionChips" :key="item" class="chip">{{ item }}</text>
@@ -56,7 +61,7 @@
 
             <view class="info-block">
               <text class="info-label">审核说明</text>
-              <text class="info-value">通过后项目进入招募中，并自动沉淀到资料库；驳回后保留负责人，返回需修改状态，可重新提交。</text>
+              <textarea v-model="reviewComment" class="review-comment" maxlength="300" placeholder="通过时可填写建议；驳回时必须填写修改原因。" />
             </view>
 
             <view class="action-row">
@@ -76,7 +81,7 @@
           <text class="card-title">快捷操作</text>
           <view class="quick-row">
             <view class="quick primary" @click="goPublish">发布新档期</view>
-            <view class="quick ghost" @click="loadPending">刷新列表</view>
+            <view class="quick ghost" @click="goCompletion">完成确认</view>
           </view>
         </view>
       </block>
@@ -96,6 +101,7 @@ const pendingProjects = ref<any[]>([]);
 const loading = ref(false);
 const submitting = ref(false);
 const permissionDenied = ref(false);
+const reviewComment = ref('');
 
 const currentProject = computed(() => pendingProjects.value[0] || null);
 const pendingMeta = computed(() => {
@@ -138,6 +144,14 @@ const goPublish = () => {
   uni.navigateTo({ url: '/pages/admin/publish' });
 };
 
+const goCompletion = () => {
+  if (!userStore.isAdmin) {
+    permissionDenied.value = true;
+    return;
+  }
+  uni.navigateTo({ url: '/pages/admin/completion' });
+};
+
 const loadPending = async () => {
   if (submitting.value) return;
   loading.value = true;
@@ -150,6 +164,7 @@ const loadPending = async () => {
       return;
     }
     pendingProjects.value = await getReviewProjects();
+    reviewComment.value = '';
   } catch (err: any) {
     if (err?.code === 'NO_PERMISSION' || /权限|permission/i.test(err?.message || '')) {
       permissionDenied.value = true;
@@ -166,7 +181,7 @@ const approve = async () => {
   if (!currentProject.value || submitting.value) return;
   submitting.value = true;
   try {
-    await reviewLesson(currentProject.value._id, 'approve');
+    await reviewLesson(currentProject.value._id, 'approve', reviewComment.value.trim());
     uni.showToast({ title: '已通过', icon: 'success' });
     await loadPending();
   } catch (err: any) {
@@ -178,9 +193,13 @@ const approve = async () => {
 
 const reject = async () => {
   if (!currentProject.value || submitting.value) return;
+  if (!reviewComment.value.trim()) {
+    uni.showToast({ title: '驳回时请填写修改原因', icon: 'none' });
+    return;
+  }
   submitting.value = true;
   try {
-    await reviewLesson(currentProject.value._id, 'reject', '请补充课堂流程和材料清单');
+    await reviewLesson(currentProject.value._id, 'reject', reviewComment.value.trim());
     uni.showToast({ title: '已驳回', icon: 'none' });
     await loadPending();
   } catch (err: any) {
@@ -337,6 +356,22 @@ onMounted(loadPending);
 .info-value {
   color: $text-secondary;
   font-size: 26rpx;
+  line-height: 1.6;
+}
+
+.lesson-content {
+  white-space: pre-wrap;
+}
+
+.review-comment {
+  width: 100%;
+  min-height: 126rpx;
+  box-sizing: border-box;
+  padding: 18rpx;
+  border-radius: 14rpx;
+  background: rgba(31, 78, 95, 0.06);
+  color: $text-primary;
+  font-size: 25rpx;
   line-height: 1.6;
 }
 

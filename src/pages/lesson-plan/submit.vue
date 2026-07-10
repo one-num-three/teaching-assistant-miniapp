@@ -43,6 +43,17 @@
         </view>
       </view>
 
+      <view class="field-block">
+        <text class="field-label">教案摘要与课堂流程</text>
+        <textarea
+          v-model="lessonContent"
+          class="content-input"
+          maxlength="800"
+          placeholder="请写明课程目标、课堂流程、材料准备和安全注意事项，供管理员审核。"
+        />
+        <text class="content-count">{{ lessonContent.length }}/800</text>
+      </view>
+
       <view class="preview-card">
         <text class="preview-title">{{ lessonTitle }}</text>
         <view class="preview-page">
@@ -74,6 +85,7 @@ import { chooseFile } from '@/utils/platform';
 const projectId = ref('');
 const project = ref<any>(null);
 const lessonTitle = ref('');
+const lessonContent = ref('');
 const submitting = ref(false);
 const selectedFile = ref<{ name: string; size: string } | null>({
   name: '本地测试教案.pdf',
@@ -104,6 +116,7 @@ const loadProject = async () => {
   try {
     project.value = await getProjectDetail(projectId.value);
     lessonTitle.value = project.value.lesson_plan?.title || `${project.value.title} 教案`;
+    lessonContent.value = project.value.lesson_plan?.content || '';
     if (project.value.lesson_plan?.file_name) {
       selectedFile.value = {
         name: project.value.lesson_plan.file_name,
@@ -142,12 +155,17 @@ const submitLesson = async () => {
     uni.showToast({ title: '请先选择教案文件', icon: 'none' });
     return;
   }
+  if (lessonContent.value.trim().length < 20) {
+    uni.showToast({ title: '请补充至少 20 字的教案摘要', icon: 'none' });
+    return;
+  }
   submitting.value = true;
   try {
     await uploadLesson(projectId.value, {
       title: lessonTitle.value,
       fileName: selectedFile.value.name,
-      size: selectedFile.value.size
+      size: selectedFile.value.size,
+      content: lessonContent.value.trim()
     });
     uni.showToast({ title: '教案已提交审核', icon: 'success' });
     setTimeout(() => uni.navigateBack(), 800);
@@ -264,6 +282,25 @@ onLoad((options: any) => {
   padding: 0 26rpx;
   color: $text-primary;
   font-size: 28rpx;
+}
+
+.content-input {
+  @include soft-card;
+  width: 100%;
+  min-height: 190rpx;
+  padding: 22rpx 26rpx;
+  box-sizing: border-box;
+  color: $text-primary;
+  font-size: 27rpx;
+  line-height: 1.6;
+}
+
+.content-count {
+  display: block;
+  margin-top: 10rpx;
+  color: $text-muted;
+  font-size: 22rpx;
+  text-align: right;
 }
 
 .upload-zone {
