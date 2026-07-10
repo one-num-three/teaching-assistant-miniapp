@@ -3,7 +3,7 @@
     <view class="mine-hero">
       <view class="ink-nav">
         我的
-        <view class="bell-dot"></view>
+        <view class="bell-dot" @click="goNotifications"><text v-if="unreadCount" class="bell-count">{{ unreadCount > 9 ? '9+' : unreadCount }}</text></view>
       </view>
       <view class="profile-row">
         <image class="avatar" :src="userInfo?.avatar || defaultAvatar" />
@@ -89,10 +89,10 @@
       </view>
 
       <view class="menu-group">
-        <view v-if="userStore.isGuest" class="menu-item" @click="goProfile">
+        <view class="menu-item" @click="goProfile">
           <view class="menu-icon doc"></view>
-          <text>完善业务资料</text>
-          <text class="pill amber menu-pill">待认证</text>
+          <text>{{ userStore.isGuest ? '完善业务资料' : '个人资料' }}</text>
+          <text v-if="userStore.isGuest" class="pill amber menu-pill">待认证</text>
           <text class="arrow">›</text>
         </view>
         <view class="menu-item" @click="goHours">
@@ -100,13 +100,13 @@
           <text>志愿服务时长统计</text>
           <text class="arrow">›</text>
         </view>
-        <view class="menu-item">
+        <view class="menu-item" @click="goReimbursements">
           <view class="menu-icon timer"></view>
           <text>报销进度</text>
-          <text class="pill blue menu-pill">1 待审</text>
+          <text v-if="reimbursementPending" class="pill blue menu-pill">{{ reimbursementPending }} 待审</text>
           <text class="arrow">›</text>
         </view>
-        <view class="menu-item">
+        <view class="menu-item" @click="goFavorites">
           <view class="menu-icon folder"></view>
           <text>我的资料收藏</text>
           <text class="arrow">›</text>
@@ -117,6 +117,12 @@
         <view class="menu-item" @click="goAdmin">
           <view class="menu-icon calendar"></view>
           <text>档期发布工具</text>
+          <text class="pill amber menu-pill">管理员</text>
+          <text class="arrow">›</text>
+        </view>
+        <view class="menu-item" @click="goProjectManage">
+          <view class="menu-icon calendar"></view>
+          <text>档期管理台</text>
           <text class="pill amber menu-pill">管理员</text>
           <text class="arrow">›</text>
         </view>
@@ -142,7 +148,7 @@ import { computed, ref } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import { getDevState, type DevState } from '@/api/debug';
 import { getProjects } from '@/api/project';
-import { login, resetDevData, switchDevUser } from '@/api/user';
+import { getNotifications, getReimbursements, login, resetDevData, switchDevUser } from '@/api/user';
 import { useUserStore } from '@/stores/user';
 
 const userStore = useUserStore();
@@ -153,6 +159,8 @@ const activeUserId = computed(() => userInfo.value?.openid || '');
 const projects = ref<any[]>([]);
 const debugState = ref<DevState | null>(null);
 const loadingProjects = ref(false);
+const unreadCount = ref(0);
+const reimbursementPending = ref(0);
 
 const devUsers = [
   { id: 'admin-1', label: '管理员' },
@@ -191,10 +199,14 @@ const myProjects = computed(() => {
 async function refreshPage() {
   loadingProjects.value = true;
   try {
-    const [user, projectList, state] = await Promise.all([login(), getProjects(), getDevState()]);
+    const [user, projectList, state, notifications, reimbursements] = await Promise.all([
+      login(), getProjects(), getDevState(), getNotifications(), getReimbursements()
+    ]);
     userStore.setUser(user);
     projects.value = projectList;
     debugState.value = state;
+    unreadCount.value = notifications.filter((item: any) => !item.read).length;
+    reimbursementPending.value = reimbursements.filter((item: any) => item.status === 'pending').length;
   } catch (error) {
     uni.showToast({ title: '本地数据加载失败', icon: 'none' });
   } finally {
@@ -246,7 +258,9 @@ const statusText = (status: string) => {
     revision_required: '需修改',
     recruiting: '招募中',
     locked: '已锁定',
-    completed: '已完成'
+    completed: '已完成',
+    completion_pending: '待完成确认',
+    cancelled: '已取消'
   };
   return map[status] || status;
 };
@@ -281,6 +295,22 @@ const goCompletionReview = () => {
   uni.navigateTo({ url: '/pages/admin/completion' });
 };
 
+const goNotifications = () => {
+  uni.navigateTo({ url: '/pages/mine/notifications' });
+};
+
+const goFavorites = () => {
+  uni.navigateTo({ url: '/pages/mine/favorites' });
+};
+
+const goReimbursements = () => {
+  uni.navigateTo({ url: '/pages/mine/reimbursements' });
+};
+
+const goProjectManage = () => {
+  uni.navigateTo({ url: '/pages/admin/projects' });
+};
+
 onShow(refreshPage);
 </script>
 
@@ -312,6 +342,22 @@ onShow(refreshPage);
   height: 10rpx;
   border-radius: 50%;
   background: $amber;
+}
+
+.bell-count {
+  position: absolute;
+  left: 32rpx;
+  top: -16rpx;
+  min-width: 28rpx;
+  height: 28rpx;
+  padding: 0 6rpx;
+  box-sizing: border-box;
+  border-radius: 999rpx;
+  background: $red;
+  color: #fff;
+  font-size: 18rpx;
+  line-height: 28rpx;
+  text-align: center;
 }
 
 .profile-row {

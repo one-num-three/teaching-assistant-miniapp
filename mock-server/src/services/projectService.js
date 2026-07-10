@@ -247,6 +247,39 @@ async function publishProject(userId, payload) {
   return clone(project);
 }
 
+async function updateProject(userId, projectId, payload) {
+  const db = readDb();
+  assertAdmin(getUser(db, userId));
+  const project = assertFound(db.projects.find((item) => item._id === projectId), 'Project not found');
+  if (['completed', 'cancelled', 'completion_pending'].includes(project.project_status)) {
+    throw createError('Current project cannot be edited', 409, 'INVALID_STATUS');
+  }
+
+  const editableFields = ['title', 'date', 'start_time', 'end_time', 'location', 'target_audience'];
+  editableFields.forEach((field) => {
+    if (payload[field] !== undefined && String(payload[field]).trim()) project[field] = String(payload[field]).trim();
+  });
+  if (Array.isArray(payload.outline) && payload.outline.length) {
+    project.outline = payload.outline.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (payload.positions && typeof payload.positions === 'object') {
+    POSITION_KEYS.forEach((key) => {
+      if (payload.positions[key] === undefined) return;
+      const total = getPositionTotal(payload.positions, key);
+      const current = project.positions[key]?.members?.length || 0;
+      if (total < current) throw createError('Position total cannot be lower than current members', 400, 'POSITION_BELOW_CLAIMED');
+      project.positions[key].total = total;
+    });
+  }
+  project.datetime = `${project.date} ${project.start_time}`;
+  if (['recruiting', 'locked'].includes(project.project_status)) {
+    project.project_status = isProjectFull(project) ? 'locked' : 'recruiting';
+  }
+  project.updated_at = Date.now();
+  await writeDb(db);
+  return clone(project);
+}
+
 async function claimLeader(userId, projectId) {
   const db = readDb();
   const user = getUser(db, userId);
@@ -569,5 +602,6 @@ module.exports = {
   reviewProjectCompletion,
   reviewLesson,
   submitProjectCompletion,
-  submitLesson
+  submitLesson,
+  updateProject
 };

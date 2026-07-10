@@ -98,3 +98,10 @@ export const removeProjectMember = async (
     data: { positionKey, targetUserId, reason }
   });
 };
+
+export const updateProject = async (projectId: string, payload: any): Promise<any> => {
+  return request<any>(`/projects/${projectId}/update`, {
+    method: 'POST',
+    data: payload
+  });
+};

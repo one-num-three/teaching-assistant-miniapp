@@ -269,6 +269,40 @@ async function testAdminProjectChangeControls() {
   assert.strictEqual(project.cancel_reason, 'weather warning');
 }
 
+async function testPersonalCenterCollectionsAndNotifications() {
+  await resetDb();
+  const notifications = await userService.listNotifications('volunteer-1');
+  assert.strictEqual(notifications.length, 1);
+  assert.strictEqual(notifications[0].read, false);
+  await userService.markNotificationRead('volunteer-1', notifications[0]._id);
+  assert.strictEqual((await userService.listNotifications('volunteer-1'))[0].read, true);
+
+  let favorites = await userService.listFavorites('volunteer-1');
+  assert.strictEqual(favorites.length, 1);
+  await userService.toggleFavorite('volunteer-1', 'material-1');
+  favorites = await userService.listFavorites('volunteer-1');
+  assert.strictEqual(favorites.length, 0);
+
+  const reimbursement = await userService.submitReimbursement('volunteer-1', {
+    title: '交通补贴', amount: 12.5, project_name: '本地测试项目', note: '地铁往返'
+  });
+  assert.strictEqual(reimbursement.status, 'pending');
+  assert.strictEqual((await userService.listReimbursements('volunteer-1')).length, 2);
+}
+
+async function testAdminCanEditProjectPositions() {
+  await resetDb();
+  let project = await projectService.updateProject('admin-1', 'project-1', {
+    title: '趣味科普：地球的呼吸（调整）', positions: { assistant: 3, ppt: 1 }
+  });
+  assert.strictEqual(project.title, '趣味科普：地球的呼吸（调整）');
+  assert.strictEqual(project.positions.assistant.total, 3);
+  await assertRejectsWithCode(
+    () => projectService.updateProject('admin-1', 'project-1', { positions: { ppt: 0 } }),
+    'POSITION_BELOW_CLAIMED'
+  );
+}
+
 async function main() {
   await testUserProfileUpdate();
   await testPublishPermissionAndProjectVisible();
@@ -280,6 +314,8 @@ async function main() {
   await testReviewHistoryAndRevisionVersion();
   await testCompletionConfirmationCreatesHoursOnce();
   await testAdminProjectChangeControls();
+  await testPersonalCenterCollectionsAndNotifications();
+  await testAdminCanEditProjectPositions();
   await resetDb();
   console.log('mock api tests passed');
 }

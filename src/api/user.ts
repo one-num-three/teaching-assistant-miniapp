@@ -30,3 +30,19 @@ export const resetDevData = async (): Promise<void> => {
 export const getVolunteerHours = async (): Promise<any[]> => {
   return request<any[]>('/me/volunteer-hours');
 };
+
+export const getNotifications = async (): Promise<any[]> => request<any[]>('/notifications');
+
+export const markNotificationRead = async (notificationId: string): Promise<any> => {
+  return request<any>(`/notifications/${notificationId}/read`, { method: 'POST' });
+};
+
+export const markAllNotificationsRead = async (): Promise<void> => {
+  await request('/notifications/read-all', { method: 'POST' });
+};
+
+export const getReimbursements = async (): Promise<any[]> => request<any[]>('/me/reimbursements');
+
+export const submitReimbursement = async (payload: any): Promise<any> => {
+  return request<any>('/me/reimbursements', { method: 'POST', data: payload });
+};

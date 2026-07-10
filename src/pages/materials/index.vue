@@ -42,6 +42,9 @@
               <text>{{ item.date }}</text>
             </view>
           </view>
+          <view class="favorite-action" :class="{ active: favoriteIds.has(item._id) }" @click.stop="toggleFavorite(item)">
+            {{ favoriteIds.has(item._id) ? '已收藏' : '收藏' }}
+          </view>
         </view>
       </block>
     </view>
@@ -51,7 +54,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
-import { getMaterials } from '@/api/material';
+import { getFavoriteMaterials, getMaterials, toggleMaterialFavorite } from '@/api/material';
 import { getTempFileURL, openDocument } from '@/utils/platform';
 
 const categories = [
@@ -65,6 +68,7 @@ const activeCategory = ref('all');
 const keyword = ref('');
 const lessons = ref<any[]>([]);
 const loading = ref(false);
+const favoriteIds = ref(new Set<string>());
 let didMount = false;
 
 const filteredLessons = computed(() => {
@@ -79,12 +83,27 @@ const filteredLessons = computed(() => {
 const fetchLessons = async () => {
   loading.value = true;
   try {
-    lessons.value = await getMaterials();
+    const [materials, favorites] = await Promise.all([getMaterials(), getFavoriteMaterials()]);
+    lessons.value = materials;
+    favoriteIds.value = new Set(favorites.map((item: any) => item._id));
   } catch (err) {
     console.error(err);
     uni.showToast({ title: '资料加载失败', icon: 'none' });
   } finally {
     loading.value = false;
+  }
+};
+
+const toggleFavorite = async (item: any) => {
+  try {
+    const result = await toggleMaterialFavorite(item._id);
+    const next = new Set(favoriteIds.value);
+    if (result.favorite) next.add(item._id);
+    else next.delete(item._id);
+    favoriteIds.value = next;
+    uni.showToast({ title: result.favorite ? '已收藏' : '已取消收藏', icon: 'none' });
+  } catch {
+    uni.showToast({ title: '收藏操作失败', icon: 'none' });
   }
 };
 
@@ -224,6 +243,20 @@ onShow(() => {
 .material-info {
   min-width: 0;
   flex: 1;
+}
+
+.favorite-action {
+  flex: 0 0 auto;
+  padding: 10rpx 14rpx;
+  border-radius: 999rpx;
+  background: rgba(31, 78, 95, 0.08);
+  color: $text-secondary;
+  font-size: 21rpx;
+}
+
+.favorite-action.active {
+  background: $green-bg;
+  color: $green;
 }
 
 .material-title {

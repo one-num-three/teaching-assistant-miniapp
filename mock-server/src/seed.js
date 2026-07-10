@@ -145,9 +145,25 @@ function createSeedDb() {
         created_at: now - 120000000
       }
     ],
+    material_favorites: [
+      { _id: 'favorite-seed-1', user_id: 'volunteer-1', material_id: 'material-1', created_at: now - 3600000 }
+    ],
+    reimbursements: [
+      {
+        _id: 'reimbursement-seed-1', user_id: 'volunteer-1', user_name: '王明', title: '课堂材料采购', amount: 86.5,
+        project_name: '趣味科普：地球的呼吸', note: '颜料与实验耗材', status: 'pending', created_at: now - 7200000, updated_at: now - 7200000
+      }
+    ],
     project_claims: [],
     lesson_reviews: [],
-    notifications: []
+    notifications: [
+      {
+        _id: 'notification-seed-1', user_id: 'volunteer-1', title: '教案审核通过', content: '趣味科普：地球的呼吸已通过审核，正在招募辅助岗位。', project_id: 'project-1', read: false, created_at: now - 3600000
+      },
+      {
+        _id: 'notification-seed-2', user_id: 'admin-1', title: '新的教案待审核', content: '本地演示：管理员可在审核台处理待审核教案。', project_id: 'project-2', read: false, created_at: now - 7200000
+      }
+    ]
   };
 }
 

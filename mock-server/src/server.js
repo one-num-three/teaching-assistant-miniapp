@@ -62,8 +62,9 @@ function compactLog(item, titleFallback, subtitleFallback) {
 }
 
 function buildDevState(db) {
+  const currentUserId = db.currentUserId || 'admin-1';
   return {
-    currentUserId: db.currentUserId || 'admin-1',
+    currentUserId,
     counts: {
       users: db.users.length,
       projects: db.projects.length,
@@ -74,7 +75,10 @@ function buildDevState(db) {
     },
     recentClaims: db.project_claims.slice(0, 5).map((item) => compactLog(item, '认领记录', item.position_key || '')),
     recentReviews: db.lesson_reviews.slice(0, 5).map((item) => compactLog(item, '审核记录', item.action || '')),
-    recentNotifications: db.notifications.slice(0, 5).map((item) => compactLog(item, '通知记录', item.user_id || ''))
+    recentNotifications: db.notifications
+      .filter((item) => item.user_id === currentUserId)
+      .slice(0, 5)
+      .map((item) => compactLog(item, '通知记录', item.user_id || ''))
   };
 }
 
@@ -143,8 +147,33 @@ async function route(req, res) {
   }
 
   if (method === 'GET' && pathname === '/api/notifications') {
-    const db = readDb();
-    return ok(res, db.notifications.filter((item) => item.user_id === userId));
+    return ok(res, await userService.listNotifications(userId));
+  }
+
+  if (method === 'POST' && pathname === '/api/notifications/read-all') {
+    return ok(res, await userService.markAllNotificationsRead(userId));
+  }
+
+  const notificationMatch = pathname.match(/^\/api\/notifications\/([^/]+)\/read$/);
+  if (method === 'POST' && notificationMatch) {
+    return ok(res, await userService.markNotificationRead(userId, decodeURIComponent(notificationMatch[1])));
+  }
+
+  if (method === 'GET' && pathname === '/api/me/favorites') {
+    return ok(res, await userService.listFavorites(userId));
+  }
+
+  if (method === 'GET' && pathname === '/api/me/reimbursements') {
+    return ok(res, await userService.listReimbursements(userId));
+  }
+
+  if (method === 'POST' && pathname === '/api/me/reimbursements') {
+    return ok(res, await userService.submitReimbursement(userId, await readBody(req)));
+  }
+
+  const materialMatch = pathname.match(/^\/api\/materials\/([^/]+)\/favorite$/);
+  if (method === 'POST' && materialMatch) {
+    return ok(res, await userService.toggleFavorite(userId, decodeURIComponent(materialMatch[1])));
   }
 
   const projectMatch = pathname.match(/^\/api\/projects\/([^/]+)(?:\/([^/]+))?$/);
@@ -177,6 +206,9 @@ async function route(req, res) {
     }
     if (method === 'POST' && action === 'remove-member') {
       return ok(res, await projectService.removeProjectMember(userId, projectId, await readBody(req)));
+    }
+    if (method === 'POST' && action === 'update') {
+      return ok(res, await projectService.updateProject(userId, projectId, await readBody(req)));
     }
   }
 

@@ -35,6 +35,34 @@
       }
     },
     {
+      "path": "pages/mine/notifications",
+      "style": {
+        "navigationBarTitleText": "通知中心",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/mine/favorites",
+      "style": {
+        "navigationBarTitleText": "我的资料收藏",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/mine/reimbursements",
+      "style": {
+        "navigationBarTitleText": "报销进度",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/mine/reimbursement-submit",
+      "style": {
+        "navigationBarTitleText": "提交报销",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/project/detail",
       "style": {
         "navigationBarTitleText": "项目详情",
@@ -73,6 +101,20 @@
       "path": "pages/admin/completion",
       "style": {
         "navigationBarTitleText": "项目完成确认台",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/admin/projects",
+      "style": {
+        "navigationBarTitleText": "档期管理",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/admin/project-edit",
+      "style": {
+        "navigationBarTitleText": "编辑档期",
         "navigationStyle": "custom"
       }
     }
