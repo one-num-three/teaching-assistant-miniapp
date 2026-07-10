@@ -71,6 +71,9 @@ async function testPublishPermissionAndProjectVisible() {
 async function testProjectApprovalCreatesMaterialOnce() {
   await resetDb();
 
+  const initialAdminNotifications = await userService.listNotifications('admin-1');
+  assert.strictEqual(initialAdminNotifications.some((item) => item.project_id === 'project-2'), false);
+
   let project = await projectService.claimLeader('volunteer-1', 'project-2');
   assert.strictEqual(project.project_status, 'pending_review');
 
@@ -79,6 +82,11 @@ async function testProjectApprovalCreatesMaterialOnce() {
     fileName: 'lesson.pdf'
   });
   assert.strictEqual(project.lesson_status, 'pending_review');
+  const adminNotifications = await userService.listNotifications('admin-1');
+  assert.strictEqual(
+    adminNotifications.some((item) => item.project_id === 'project-2' && item.title === '新的教案待审核'),
+    true
+  );
 
   project = await projectService.reviewLesson('admin-1', 'project-2', { action: 'approve' });
   assert.strictEqual(project.project_status, 'recruiting');

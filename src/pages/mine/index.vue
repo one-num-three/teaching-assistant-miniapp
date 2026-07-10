@@ -590,14 +590,7 @@ onShow(refreshPage);
 }
 
 .project-mini-card::after {
-  content: '';
-  position: absolute;
-  right: -48rpx;
-  bottom: -42rpx;
-  width: 260rpx;
-  height: 150rpx;
-  opacity: 0.13;
-  background: url('/static/card-ink-corner.png') right bottom / contain no-repeat;
+  display: none;
 }
 
 .mini-title,

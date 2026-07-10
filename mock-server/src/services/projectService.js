@@ -119,6 +119,20 @@ function pushNotification(db, userId, title, content, projectId) {
   });
 }
 
+function notifyAdminsForLessonReview(db, project, submitter) {
+  db.users
+    .filter((user) => (user.roles || []).some((role) => ADMIN_ROLES.includes(role)))
+    .forEach((admin) => {
+      pushNotification(
+        db,
+        admin.openid,
+        '新的教案待审核',
+        `${submitter.name} 已提交《${project.title}》教案，请及时审核。`,
+        project._id
+      );
+    });
+}
+
 function logClaim(db, project, user, positionKey, action = 'claim') {
   db.project_claims.unshift({
     _id: `claim-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -369,6 +383,7 @@ async function submitLesson(userId, projectId, payload) {
   project.project_status = 'pending_review';
   project.updated_at = Date.now();
   pushNotification(db, user.openid, 'Lesson submitted', `${project.title} is waiting for admin review.`, project._id);
+  notifyAdminsForLessonReview(db, project, user);
 
   await writeDb(db);
   return clone(project);

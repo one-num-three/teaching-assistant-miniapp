@@ -285,9 +285,7 @@ onShow(() => {
 .calendar-panel {
   position: relative;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.985) 100%),
-    url('/static/ink-mountain-fade.png') center top / 100% auto no-repeat;
+  background: rgba(255, 254, 250, 0.98);
   border: 1rpx solid rgba(69, 89, 88, 0.1);
   border-radius: $radius-md;
   box-shadow: $shadow-card;
@@ -296,14 +294,7 @@ onShow(() => {
 }
 
 .calendar-panel::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 90rpx;
-  background: linear-gradient(180deg, rgba(242, 244, 248, 0.32), transparent);
-  pointer-events: none;
+  display: none;
 }
 
 .month-bar {

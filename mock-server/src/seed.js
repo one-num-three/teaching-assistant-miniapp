@@ -220,9 +220,6 @@ function createSeedDb() {
     notifications: [
       {
         _id: 'notification-seed-1', user_id: 'volunteer-1', title: '教案审核通过', content: '趣味科普：地球的呼吸已通过审核，正在招募辅助岗位。', project_id: 'project-1', read: false, created_at: now - 3600000
-      },
-      {
-        _id: 'notification-seed-2', user_id: 'admin-1', title: '新的教案待审核', content: '本地演示：管理员可在审核台处理待审核教案。', project_id: 'project-2', read: false, created_at: now - 7200000
       }
     ]
   };

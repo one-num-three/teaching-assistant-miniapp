@@ -248,14 +248,7 @@ onMounted(loadPending);
 }
 
 .pending-card::after {
-  content: '';
-  position: absolute;
-  right: -42rpx;
-  bottom: -42rpx;
-  width: 280rpx;
-  height: 160rpx;
-  opacity: 0.18;
-  background: url('/static/card-ink-corner.png') right bottom / contain no-repeat;
+  display: none;
 }
 
 .pending-small,

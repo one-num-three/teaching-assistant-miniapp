@@ -44,20 +44,6 @@
     right: 0;
     bottom: -2rpx;
     height: 158rpx;
-    background:
-      linear-gradient(180deg, transparent 0%, rgba(242, 244, 241, 0.12) 52%, $paper 100%),
-      url('/static/ink-mountain-fade.png') center bottom / 112% auto no-repeat;
-    opacity: 0.82;
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    right: -24rpx;
-    top: 0;
-    width: 176rpx;
-    height: 220rpx;
-    opacity: 0.24;
-    background: url('/static/bamboo-corner.png') right top / contain no-repeat;
+    background: linear-gradient(180deg, transparent 0%, rgba(242, 244, 241, 0.16) 58%, $paper 100%);
   }
 }

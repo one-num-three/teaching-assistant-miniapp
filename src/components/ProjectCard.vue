@@ -119,14 +119,7 @@ const goToDetail = () => {
 }
 
 .project-card::after {
-  content: '';
-  position: absolute;
-  right: -42rpx;
-  bottom: -38rpx;
-  width: 260rpx;
-  height: 150rpx;
-  opacity: 0.1;
-  background: url('/static/card-ink-corner.png') right bottom / contain no-repeat;
+  display: none;
 }
 
 .card-top {
