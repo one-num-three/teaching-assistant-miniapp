@@ -38,7 +38,7 @@
 
             <view class="info-block">
               <text class="info-label">教案文件</text>
-              <view class="file-line">
+              <view class="file-line previewable" @click="viewLessonPlan">
                 <view class="pdf-icon">PDF</view>
                 <view>
                   <text class="file-name">{{ currentProject.lesson_plan?.file_name || '本地测试教案.pdf' }}</text>
@@ -150,6 +150,11 @@ const goCompletion = () => {
     return;
   }
   uni.navigateTo({ url: '/pages/admin/completion' });
+};
+
+const viewLessonPlan = () => {
+  if (!currentProject.value?.lesson_plan) return;
+  uni.navigateTo({ url: `/pages/document/preview?source=project&id=${currentProject.value._id}` });
 };
 
 const loadPending = async () => {
@@ -379,6 +384,13 @@ onMounted(loadPending);
   display: flex;
   align-items: center;
   gap: 16rpx;
+}
+
+.file-line.previewable {
+  padding: 12rpx;
+  margin: -12rpx;
+  border-radius: 12rpx;
+  background: rgba(31, 78, 95, 0.04);
 }
 
 .pdf-icon {

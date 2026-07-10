@@ -6,7 +6,7 @@ import { ref } from 'vue'; import { onShow } from '@dcloudio/uni-app'; import { 
 const items = ref<any[]>([]); const loading = ref(false); const goBack = () => uni.navigateBack();
 const load = async () => { loading.value = true; try { items.value = await getFavoriteMaterials(); } catch { uni.showToast({ title: '收藏加载失败', icon: 'none' }); } finally { loading.value = false; } };
 const toggle = async (item: any) => { await toggleMaterialFavorite(item._id); items.value = items.value.filter((entry) => entry._id !== item._id); uni.showToast({ title: '已取消收藏', icon: 'none' }); };
-const view = (item: any) => uni.showModal({ title: item.title, content: `文件：${item.file_name || '本地资料'}\nH5 阶段仅展示文件信息。`, showCancel: false });
+const view = (item: any) => uni.navigateTo({ url: `/pages/document/preview?source=material&id=${item._id}` });
 onShow(load);
 </script>
 <style lang="scss" scoped>

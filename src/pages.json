@@ -70,6 +70,13 @@
       }
     },
     {
+      "path": "pages/document/preview",
+      "style": {
+        "navigationBarTitleText": "文档预览",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/lesson-plan/submit",
       "style": {
         "navigationBarTitleText": "提交教案",

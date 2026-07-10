@@ -55,7 +55,6 @@
 import { computed, onMounted, ref } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import { getFavoriteMaterials, getMaterials, toggleMaterialFavorite } from '@/api/material';
-import { getTempFileURL, openDocument } from '@/utils/platform';
 
 const categories = [
   { key: 'all', name: '全部' },
@@ -107,22 +106,8 @@ const toggleFavorite = async (item: any) => {
   }
 };
 
-const handleViewLesson = async (item: any) => {
-  try {
-    if (!item.file_id || String(item.file_id).startsWith('local')) {
-      uni.showToast({ title: 'H5 本地文件预览占位', icon: 'none' });
-      return;
-    }
-    uni.showLoading({ title: '获取文件中...' });
-    const urlList = await getTempFileURL([item.file_id]);
-    const tempUrl = urlList[0]?.tempFileURL;
-    if (!tempUrl) throw new Error('获取文件链接失败');
-    openDocument(tempUrl);
-  } catch (err) {
-    uni.showToast({ title: '打开失败', icon: 'none' });
-  } finally {
-    uni.hideLoading();
-  }
+const handleViewLesson = (item: any) => {
+  uni.navigateTo({ url: `/pages/document/preview?source=material&id=${item._id}` });
 };
 
 onMounted(() => {

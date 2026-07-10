@@ -146,6 +146,13 @@ async function route(req, res) {
     return ok(res, db.materials.sort((a, b) => b.created_at - a.created_at));
   }
 
+  const materialDetailMatch = pathname.match(/^\/api\/materials\/([^/]+)$/);
+  if (method === 'GET' && materialDetailMatch) {
+    const material = readDb().materials.find((item) => item._id === decodeURIComponent(materialDetailMatch[1]));
+    if (!material) return fail(res, Object.assign(new Error('资料不存在'), { status: 404, code: 'NOT_FOUND' }));
+    return ok(res, material);
+  }
+
   if (method === 'GET' && pathname === '/api/notifications') {
     return ok(res, await userService.listNotifications(userId));
   }

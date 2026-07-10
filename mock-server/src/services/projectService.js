@@ -45,6 +45,16 @@ function getPositionTotal(input, key) {
   return Math.max(0, Number(value || 0));
 }
 
+function inferFileType(fileName = '', type = '') {
+  const supplied = String(type || '').toUpperCase();
+  if (['PDF', 'WORD', 'PPT'].includes(supplied)) return supplied;
+  const extension = String(fileName).split('.').pop()?.toLowerCase();
+  if (extension === 'pdf') return 'PDF';
+  if (['doc', 'docx'].includes(extension)) return 'WORD';
+  if (['ppt', 'pptx'].includes(extension)) return 'PPT';
+  return 'PDF';
+}
+
 function normalizePositions(input = {}) {
   return {
     lecturer: { total: 1, members: [] },
@@ -84,9 +94,9 @@ function createMaterialFromProject(db, project) {
     file_name: project.lesson_plan.file_name,
     file_id: project.lesson_plan.file_id,
     category: 'science',
-    type: 'PDF',
     tone: 'blue',
     tag: 'auto',
+    type: project.lesson_plan.file_type || inferFileType(project.lesson_plan.file_name),
     count: 'approved lesson',
     date: new Date().toISOString().slice(0, 10),
     source_project_id: project._id,
@@ -326,6 +336,7 @@ async function submitLesson(userId, projectId, payload) {
     submitter_id: user.openid,
     submitter_name: user.name,
     content: String(payload.content || '').trim(),
+    file_type: inferFileType(payload.fileName, payload.fileType),
     version: Number(project.lesson_plan?.version || 0) + 1
   };
   project.lesson_status = 'pending_review';

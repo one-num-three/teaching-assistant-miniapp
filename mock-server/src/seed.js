@@ -68,6 +68,8 @@ function createSeedDb() {
           file_id: 'local-file-project-1',
           file_name: '趣味科普地球的呼吸.pdf',
           size: '2.1 MB',
+          file_type: 'PDF',
+          content: '课程目标：帮助学生理解地球生态与低碳生活的关系。\n教学流程：通过图片导入、实验演示、小组讨论和互动问答完成课堂。\n材料准备：地球仪、树叶样本、卡片和彩色贴纸。',
           submitted_at: now - 72000000,
           submitter_id: 'volunteer-1',
           submitter_name: '王明'
@@ -140,9 +142,47 @@ function createSeedDb() {
         tag: '精选',
         count: '1428 字',
         date: '2025-06-01',
+        preview_content: '课程目标：让学生通过观察叶片和小实验，理解光合作用的基本过程。\n教学流程：用问题导入，展示实验装置，组织小组记录观察结果，最后完成知识卡片。\n材料准备：新鲜绿叶、透明杯、彩色笔、记录卡和安全剪刀。',
         source_project_id: '',
         source_project_title: '',
         created_at: now - 120000000
+      },
+      {
+        _id: 'material-2',
+        title: '古诗飞花令互动课件',
+        file_name: '古诗飞花令互动课件.pptx',
+        file_id: 'local-material-2',
+        category: 'humanity',
+        type: 'PPT',
+        tone: 'green',
+        tag: '课堂互动',
+        count: '12 页',
+        date: '2025-05-20',
+        preview_content: '用飞花令游戏带领学生感受古诗的韵律与意境。',
+        slides: [
+          { title: '课堂导入', points: ['诗词里的四季', '今天的飞花令主题'] },
+          { title: '规则讲解', points: ['按小组轮流答题', '说出含“花”的诗句'] },
+          { title: '互动挑战', points: ['小组计分赛', '创作自己的诗句'] }
+        ],
+        source_project_id: '',
+        source_project_title: '',
+        created_at: now - 130000000
+      },
+      {
+        _id: 'material-3',
+        title: '非遗剪纸手工课方案',
+        file_name: '非遗剪纸手工课方案.docx',
+        file_id: 'local-material-3',
+        category: 'art',
+        type: 'WORD',
+        tone: 'amber',
+        tag: '手工活动',
+        count: '980 字',
+        date: '2025-06-05',
+        preview_content: '课程目标：认识剪纸的基本纹样与文化寓意。\n教学流程：教师展示作品，讲解折叠与剪刻方法，学生完成一张主题剪纸。\n安全提示：使用安全剪刀，助教巡视并协助低年级学生。',
+        source_project_id: '',
+        source_project_title: '',
+        created_at: now - 125000000
       }
     ],
     material_favorites: [

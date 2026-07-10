@@ -93,6 +93,17 @@ async function testProjectApprovalCreatesMaterialOnce() {
   assert.strictEqual(afterFirstReview.notifications.some((item) => item.user_id === 'volunteer-1'), true);
 }
 
+async function testLessonFileTypeFlowsToMaterialLibrary() {
+  await resetDb();
+  await projectService.claimLeader('volunteer-1', 'project-2');
+  await projectService.submitLesson('volunteer-1', 'project-2', {
+    title: '折纸课互动课件', fileName: '折纸课互动课件.pptx', content: '课堂导入\n折纸示范\n互动展示'
+  });
+  await projectService.reviewLesson('admin-1', 'project-2', { action: 'approve' });
+  const material = readDb().materials.find((item) => item.source_project_id === 'project-2');
+  assert.strictEqual(material.type, 'PPT');
+}
+
 async function testSupportPositionCapacity() {
   await resetDb();
   const createdProject = await projectService.publishProject('admin-1', {
@@ -307,6 +318,7 @@ async function main() {
   await testUserProfileUpdate();
   await testPublishPermissionAndProjectVisible();
   await testProjectApprovalCreatesMaterialOnce();
+  await testLessonFileTypeFlowsToMaterialLibrary();
   await testSupportPositionCapacity();
   await testSupportPositionCanBeCancelledWithinTenMinutes();
   await testSupportPositionCancelExpiresAfterTenMinutes();

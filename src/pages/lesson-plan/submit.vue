@@ -33,7 +33,7 @@
           <text class="upload-hint">H5 使用模拟文件；微信端后续接入 Word / PDF / PPT 上传</text>
         </view>
 
-        <view class="file-card" v-if="selectedFile">
+        <view class="file-card" v-if="selectedFile" @click="previewSavedLesson">
           <view class="pdf-icon">PDF</view>
           <view class="file-info">
             <text class="file-name">{{ selectedFile.name }}</text>
@@ -140,6 +140,14 @@ const chooseLessonFile = async () => {
   } catch (err) {
     uni.showToast({ title: '文件选择失败', icon: 'none' });
   }
+};
+
+const previewSavedLesson = () => {
+  if (!project.value?.lesson_plan) {
+    uni.showToast({ title: '提交后可在此预览已保存教案', icon: 'none' });
+    return;
+  }
+  uni.navigateTo({ url: `/pages/document/preview?source=project&id=${project.value._id}` });
 };
 
 const submitLesson = async () => {
